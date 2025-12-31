@@ -1,46 +1,49 @@
-from fastapi import FastAPI, HTTPException
-from typing import List
-from pydantic import BaseModel
-import uuid
+# micro_app/src/main.py - AJOUTEZ CES VULNÉRABILITÉS
+import sqlite3
+import pickle
+import subprocess
+from fastapi import FastAPI
 
-app = FastAPI(title="DevSecOps Demo API", version="1.0.0")
+app = FastAPI()
 
-# Modèle de données
-class Item(BaseModel):
-    id: str
-    name: str
-    description: str = None
+# VULNÉRABILITÉ 1 : Injection SQL
+@app.get("/search/{query}")
+def search(query: str):
+    conn = sqlite3.connect("test.db")
+    # VULNÉRABLE : concaténation directe
+    cursor = conn.execute(f"SELECT * FROM products WHERE name = '{query}'")
+    return {"results": cursor.fetchall()}
 
-# Base de données en mémoire
-items_db = []
+# VULNÉRABILITÉ 2 : Désérialisation non sécurisée
+@app.post("/load_data")
+def load_data(data: str):
+    # VULNÉRABLE : pickle non sécurisé
+    loaded = pickle.loads(data.encode())
+    return {"data": loaded}
 
-@app.get("/")
-def read_root():
-    return {"message": "API DevSecOps - Projet de Fin d'Année"}
+# VULNÉRABILITÉ 3 : Command Injection
+@app.get("/run/{command}")
+def run_command(command: str):
+    # VULNÉRABLE : commande système
+    result = subprocess.run(command, shell=True, capture_output=True)
+    return {"output": result.stdout.decode()}
 
-@app.get("/items", response_model=List[Item])
-def get_items():
-    return items_db
 
-@app.post("/items", response_model=Item, status_code=201)
-def create_item(name: str, description: str = None):
-    new_item = Item(
-        id=str(uuid.uuid4()),
-        name=name,
-        description=description
-    )
-    items_db.append(new_item)
-    return new_item
+# Ajoutez ce endpoint
+@app.get("/health")
+def health_check():
+    """Endpoint pour vérifier que l'API fonctionne"""
+    return {
+        "status": "healthy",
+        "service": "DevSecOps API",
+        "timestamp": datetime.now().isoformat()
+    }
 
-@app.get("/items/{item_id}")
-def get_item(item_id: str):
-    for item in items_db:
-        if item.id == item_id:
-            return item
-    raise HTTPException(status_code=404, detail="Item non trouvé")
-
-# Endpoint avec vulnérabilité intentionnelle pour les tests
-@app.get("/vulnerable/{user_input}")
-def vulnerable_endpoint(user_input: str):
-    # VULNÉRABLE : Injection potentielle
-    return {"input": user_input, "message": "Ce endpoint est vulnérable pour les tests de sécurité"}
+@app.get("/test/vulnerable")
+def test_vulnerable(param: str = ""):
+    """Endpoint de test avec vulnérabilité INTENTIONNELLE"""
+    # NE FAITES PAS ÇA EN PRODUCTION !
+    # Simule une vulnérabilité pour les tests SAST
+    import subprocess
+    result = subprocess.run(f"echo {param}", shell=True, capture_output=True)
+    return {"output": result.stdout.decode()}

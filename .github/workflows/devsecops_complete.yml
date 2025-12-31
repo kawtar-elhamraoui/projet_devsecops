@@ -1,0 +1,136 @@
+name: DevSecOps Pipeline Complet
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  # ========== ÉTAPE 1 : SAST + SCA ==========
+  static-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install API dependencies
+      run: |
+        cd micro_app
+        pip install -r requirements.txt
+        pip install pytest bandit safety
+        
+    - name: Run unit tests
+      run: |
+        cd micro_app
+        python -m pytest tests/ -v
+        
+    - name: SAST - SonarCloud Scan
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        echo "🔍 Démarrage analyse SonarCloud..."
+        
+        # Installation SonarScanner
+        curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+        unzip -q sonar-scanner.zip
+        
+        # Analyse avec VOTRE projectKey
+        ./sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner \
+          -Dsonar.projectKey=kwtar-elhai_projet_devsecops \
+          -Dsonar.organization=kwtar-elhai \
+          -Dsonar.sources=micro_app/src \
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.python.version=3.11
+        
+        echo "✅ Analyse SonarCloud terminée"
+      
+    - name: SAST - Bandit Security Scan
+      run: |
+        cd micro_app
+        bandit -r src/ -f json -o ../bandit-report.json
+        echo "📊 Résultats Bandit :"
+        cat ../bandit-report.json | python -m json.tool | head -50
+        
+    - name: SCA - Check Python dependencies
+      run: |
+        cd micro_app
+        safety check -r requirements.txt --json > ../safety-report.json
+        echo "📦 Sécurité des dépendances vérifiée"
+        
+    - name: Build Docker image
+      run: |
+        cd micro_app
+        docker build -t micro-app:latest .
+        
+    - name: Container Security - Trivy Scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'micro-app:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    # ========== ÉTAPE 2 : TEST DE L'API ==========
+    - name: Test API Locally
+      run: |
+        cd micro_app
+        # Démarrer l'API en arrière-plan
+        docker-compose up -d
+        sleep 5
+        
+        # Tester les endpoints
+        echo "🧪 Test des endpoints API..."
+        curl -f http://localhost:8000/ || (echo "❌ API non accessible" && exit 1)
+        curl -f http://localhost:8000/items || (echo "❌ Endpoint /items échoué" && exit 1)
+        
+        # Test avec POST
+        curl -X POST "http://localhost:8000/items?name=TestItem&description=PourTest" \
+          -H "Content-Type: application/json" || true
+        
+        echo "✅ API testée avec succès"
+        
+    # ========== ÉTAPE 3 : GÉNÉRATION DES RAPPORTS ==========
+    - name: Generate Security Dashboard
+      run: |
+        echo "# 🛡️ RAPPORT DE SÉCURITÉ DEVSECOPS" > security-dashboard.md
+        echo "## Projet: projet_devsecops" >> security-dashboard.md
+        echo "## Date: $(date)" >> security-dashboard.md
+        echo "" >> security-dashboard.md
+        echo "### ✅ Outils utilisés :" >> security-dashboard.md
+        echo "- SAST: SonarCloud + Bandit" >> security-dashboard.md
+        echo "- SCA: Safety (dépendances Python)" >> security-dashboard.md
+        echo "- Container: Trivy" >> security-dashboard.md
+        echo "- Tests: pytest + tests API" >> security-dashboard.md
+        echo "" >> security-dashboard.md
+        echo "### 🔗 Liens :" >> security-dashboard.md
+        echo "- SonarCloud: https://sonarcloud.io/project/overview?id=kwtar-elhai_projet_devsecops" >> security-dashboard.md
+        echo "- GitHub Actions: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions" >> security-dashboard.md
+        echo "" >> security-dashboard.md
+        echo "### 📊 Prochaines étapes :" >> security-dashboard.md
+        echo "1. Consulter SonarCloud pour les vulnérabilités détaillées" >> security-dashboard.md
+        echo "2. Corriger les issues identifiées" >> security-dashboard.md
+        echo "3. Améliorer la couverture de tests" >> security-dashboard.md
+        
+        cat security-dashboard.md
+        
+    - name: Upload Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+          trivy-results.sarif
+          security-dashboard.md
+        retention-days: 7
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        cd micro_app
+        docker-compose down || true
