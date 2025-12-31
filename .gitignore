@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Chatbot
+chroma_db/
+knowledge_base/reports/*
+
+# Sécurité (ne pas versionner les rapports)
+security-reports/
+*.sarif
+*.json
