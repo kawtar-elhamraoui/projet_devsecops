@@ -1,0 +1,1 @@
+SAST: Analyse statique du code. Bandit pour Python: bandit -r src/. Intégration GitHub Actions.

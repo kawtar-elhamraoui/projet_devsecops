@@ -1,0 +1,1 @@
+Pipeline DevSecOps: Code → SAST → SCA → Build → Scan → Deploy → Monitor.

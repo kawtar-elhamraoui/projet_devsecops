@@ -1,0 +1,1 @@
+DevSecOps: Intégration sécurité dans DevOps. Outils: Bandit, Trivy, SonarQube.
