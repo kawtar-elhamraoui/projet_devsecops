@@ -140,34 +140,42 @@ jobs:
           echo " API non accessible, vérifiez les logs: docker logs micro-app-api"
         fi
 
+     # =========================
+    # 11. DAST - OWASP ZAP avec UI
     # =========================
-    # 11. DAST - OWASP ZAP (CORRIGÉ)
-    # =========================
-    - name:  DAST - OWASP ZAP Scan
+    - name:  DAST - OWASP ZAP avec Interface Web
       continue-on-error: true
       run: |
-        echo " Démarrage du scan DAST avec OWASP ZAP..."
+        echo "🌐 Démarrage de ZAP avec interface web..."
         
-        # Créer un dossier pour les rapports ZAP
-        mkdir -p zap-reports
+        # Démarrer ZAP en mode UI (accessible via navigateur)
+        docker run -d \
+          --name zap-ui \
+          -p 8080:8080 \
+          -v $(pwd)/zap-reports:/zap/wrk:rw \
+          owasp/zap2docker-stable zap-webswing.sh
+        
+        echo "Attente du démarrage..."
+        sleep 20
         
         # Vérifier que l'API est accessible
-        if ! curl -s http://localhost:8000/ > /dev/null 2>&1; then
-          echo " API non accessible, arrêt du scan DAST"
+        if ! curl -s http://localhost:8000/ > /dev/null; then
+          echo "API non accessible"
           exit 0
         fi
         
-        # Utiliser owasp/zap2docker-stable au lieu de ghcr.io/zaproxy/zaproxy
-        docker run --rm \
-          --network host \
-          -v $(pwd)/zap-reports:/zap/wrk:rw \
-          owasp/zap2docker-stable zap-baseline.py \
-          -t http://localhost:8000 \
-          -r zap-report.html \
-          -w zap-report.md \
-          -J zap-report.json \
-          -x zap-report.xml \
-          -a 2>/dev/null || echo "Scan ZAP terminé (avec ou sans erreurs)"
+        # Lancer un scan rapide via API
+        docker exec zap-ui zap-cli --zap-url http://localhost:8080 \
+          quick-scan --self-contained \
+          --start-options '-config api.disablekey=true' \
+          http://localhost:8000
+        
+        # Générer le rapport HTML
+        docker exec zap-ui zap-cli --zap-url http://localhost:8080 \
+          report -o /zap/wrk/zap-report.html -f html
+        
+        echo "✅ ZAP UI disponible sur: http://localhost:8080"
+        echo "📊 Rapport généré: zap-reports/zap-report.html"
 
     # =========================
     # 12. Générer Rapport Final
