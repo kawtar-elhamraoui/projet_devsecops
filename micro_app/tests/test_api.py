@@ -4,51 +4,72 @@ from src.main import app
 
 client = TestClient(app)
 
-def test_root_endpoint():
-    """Test l'endpoint racine"""
+def test_root():
+    """Test endpoint racine"""
     response = client.get("/")
     assert response.status_code == 200
-    
     data = response.json()
-    # Vérifie la structure de base
-    assert "api" in data
-    assert "vulnerabilities" in data
-    assert "secure" in data
-    
-def test_get_items():
-    """Test l'endpoint GET /items"""
+    assert "message" in data
+    assert "API DevSecOps" in data["message"]
+
+def test_health():
+    """Test endpoint santé"""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "endpoints" in data
+
+def test_items():
+    """Test gestion des items"""
+    # GET items (vide au début)
     response = client.get("/items")
     assert response.status_code == 200
+    assert response.json() == []
     
-    items = response.json()
-    # Vérifie que c'est une liste
-    assert isinstance(items, list)
-    
-def test_create_item():
-    """Test l'endpoint POST /items"""
-    response = client.post("/items", params={"name": "TestItem", "description": "For testing"})
-    
-    # Votre API retourne probablement 200, pas 201
-    # Vérifiez ce que retourne vraiment votre API
-    if response.status_code == 200:
-        data = response.json()
-        assert "name" in data
-        assert data["name"] == "TestItem"
-    elif response.status_code == 201:
-        data = response.json()
-        assert "id" in data
-    else:
-        # Si un autre code, c'est peut-être normal aussi
-        print(f"Code de statut: {response.status_code}")
-        assert response.status_code in [200, 201]
-
-def test_api_structure():
-    """Test que l'API expose les bonnes routes"""
-    response = client.get("/")
+    # POST item
+    response = client.post("/items?name=TestItem&description=TestDesc")
+    assert response.status_code == 201
     data = response.json()
+    assert data["name"] == "TestItem"
+    assert "id" in data
     
-    # Vérifie que les routes vulnérables sont documentées
-    if "vulnerabilities" in data:
-        vuln_routes = data["vulnerabilities"]
-        assert any("sql" in route.lower() for route in vuln_routes)
-        assert any("command" in route.lower() for route in vuln_routes)
+    # GET items après création
+    response = client.get("/items")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+def test_vulnerable_endpoints():
+    """Test des endpoints vulnérables (pour démonstration)"""
+    # SQL Injection
+    response = client.get("/search/test")
+    assert response.status_code == 200
+    assert "warning" in response.json()
+    
+    # Command Injection
+    response = client.get("/run/echo%20test")
+    assert response.status_code == 200
+    assert "output" in response.json()
+
+def test_secure_endpoints():
+    """Test des endpoints sécurisés"""
+    response = client.get("/secure/search/test")
+    assert response.status_code == 200
+    assert "security" in response.json()
+    
+    response = client.get("/secure/run/echo")
+    assert response.status_code == 200
+
+def test_devsecops_info():
+    """Test info DevSecOps"""
+    response = client.get("/devsecops/info")
+    assert response.status_code == 200
+    data = response.json()
+    assert "project" in data
+    assert "security_showcase" in data
+
+# Test minimal qui passe toujours
+def test_minimal():
+    """Test minimal de validation"""
+    assert 1 + 1 == 2
+    print("✅ Validation mathématique réussie")
