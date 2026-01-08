@@ -7,8 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # ========== ÉTAPE 1 : SAST + SCA ==========
-  static-analysis:
+  security-scan:
     runs-on: ubuntu-latest
     
     steps:
@@ -189,14 +188,9 @@ jobs:
           security-dashboard.md
         retention-days: 7
         
-    - name: Upload DAST Report to GitHub Pages (Optionnel)
-      if: success()
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: zap-reports/
-        
     - name: Cleanup
       if: always()
       run: |
         cd micro_app
         docker-compose down || true
+        echo "🧹 Nettoyage terminé"
