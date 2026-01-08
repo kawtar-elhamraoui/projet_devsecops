@@ -1,7 +1,0 @@
-# Activez/désactivez des règles ZAP
-10096	ACTIVE	SQL Injection
-40012	ACTIVE	Cross Site Scripting (Reflected)
-40016	ACTIVE	Cross Site Scripting (Persistent)
-40017	ACTIVE	Cross Site Scripting (DOM)
-40018	ACTIVE	Cross Site Scripting (Persistent - Prime)
-40019	ACTIVE	Cross Site Scripting (Reflected - Prime)

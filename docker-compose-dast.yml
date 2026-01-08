@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./micro_app
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./micro_app:/app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+  zap:
+    image: owasp/zap2docker-stable
+    container_name: zap-scanner
+    ports:
+      - "8090:8090"
+    environment:
+      - ZAP_PORT=8090
+    command: zap.sh -daemon -host 0.0.0.0 -port 8090 -config api.disablekey=true
+    depends_on:
+      - api
