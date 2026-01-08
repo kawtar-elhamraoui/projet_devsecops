@@ -39,8 +39,8 @@ jobs:
         unzip -q sonar-scanner.zip
         
         ./sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner \
-          -Dsonar.projectKey=kwtar-elhai_projet_devsecops \
-          -Dsonar.organization=kwtar-elhai \
+          -Dsonar.projectKey=kawtar-elhamraoui_projet_devsecops \
+          -Dsonar.organization=kawtar-elhamraoui \
           -Dsonar.sources=micro_app/src \
           -Dsonar.host.url=https://sonarcloud.io \
           -Dsonar.login=$SONAR_TOKEN \
