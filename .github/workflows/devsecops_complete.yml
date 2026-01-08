@@ -14,13 +14,13 @@ jobs:
     # =========================
     # 1. Checkout
     # =========================
-    - name: 📥 Checkout source code
+    - name:  Checkout source code
       uses: actions/checkout@v4
 
     # =========================
     # 2. Setup Python
     # =========================
-    - name: 🐍 Setup Python
+    - name:  Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
@@ -28,7 +28,7 @@ jobs:
     # =========================
     # 3. Install dependencies
     # =========================
-    - name: 📦 Install API dependencies
+    - name:  Install API dependencies
       run: |
         cd micro_app
         pip install -r requirements.txt
@@ -37,56 +37,56 @@ jobs:
     # =========================
     # 4. Unit Tests
     # =========================
-    - name: 🧪 Run unit tests
+    - name:  Run unit tests
       run: |
         cd micro_app
-        python -m pytest tests/ -v || echo "⚠️ Tests échoués mais le pipeline continue"
+        python -m pytest tests/ -v || echo " Tests échoués mais le pipeline continue"
 
     # =========================
     # 5. SAST - SonarCloud (VERSION SIMPLIFIÉE)
     # =========================
-    - name: 🔍 SAST - SonarCloud Scan
+    - name:  SAST - SonarCloud Scan
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       continue-on-error: true
       run: |
-        echo "🔍 Démarrage analyse SonarCloud..."
+        echo " Démarrage analyse SonarCloud..."
         
         # Solution ultime : Utiliser l'action officielle SonarCloud
         # Si pas de token, on saute simplement
         if [ -z "$SONAR_TOKEN" ]; then
-          echo "ℹ️ Pas de token SonarCloud configuré, skip de l'analyse"
+          echo " Pas de token SonarCloud configuré, skip de l'analyse"
           echo '{"sonarcloud": "non_configure"}' > sonarcloud-result.json
           exit 0
         fi
         
         # Sinon, tentative simplifiée
-        echo "ℹ️ Analyse SonarCloud avec token..."
+        echo "ℹ Analyse SonarCloud avec token..."
         curl -s https://sonarcloud.io/api/qualitygates/project_status?projectKey=kawtar-elhamraoui_projet_devsecops \
           -H "Authorization: Bearer $SONAR_TOKEN" \
           -o sonarcloud-status.json 2>/dev/null || echo "{}" > sonarcloud-status.json
         
-        echo "✅ Vérification SonarCloud terminée"
+        echo " Vérification SonarCloud terminée"
 
     # =========================
     # 6. SAST - Bandit
     # =========================
-    - name: 🛡️ SAST - Bandit Security Scan
+    - name:  SAST - Bandit Security Scan
       run: |
         cd micro_app
         bandit -r src/ -f json -o ../bandit-report.json 2>/dev/null || true
 
-        echo "📊 Résumé Bandit :"
+        echo " Résumé Bandit :"
         if [ -f ../bandit-report.json ]; then
           jq '.results | length' ../bandit-report.json || echo "11 issues trouvées (d'après logs)"
         else
-          echo "⚠️ Aucun rapport Bandit généré"
+          echo " Aucun rapport Bandit généré"
         fi
 
     # =========================
     # 7. SCA - Dependencies
     # =========================
-    - name: 📦 SCA - Dependency Security (Safety)
+    - name:  SCA - Dependency Security (Safety)
       run: |
         cd micro_app
         
@@ -96,7 +96,7 @@ jobs:
         # Ancienne commande check pour compatibilité
         safety check -r requirements.txt --output text > ../safety-report.txt 2>/dev/null || true
 
-        echo "📦 Résultat Safety :"
+        echo " Résultat Safety :"
         if [ -f ../safety-report.txt ]; then
           grep -c "VULNERABILITY" ../safety-report.txt || echo "Scan terminé"
         fi
@@ -104,7 +104,7 @@ jobs:
     # =========================
     # 8. Build Docker Image
     # =========================
-    - name: 🐳 Build Docker image
+    - name:  Build Docker image
       run: |
         cd micro_app
         docker build -t micro-app:latest .
@@ -112,7 +112,7 @@ jobs:
     # =========================
     # 9. Container Scan - Trivy
     # =========================
-    - name: 🧯 Container Security - Trivy Scan
+    - name:  Container Security - Trivy Scan
       uses: aquasecurity/trivy-action@master
       continue-on-error: true
       with:
@@ -124,36 +124,36 @@ jobs:
     # =========================
     # 10. Start Application
     # =========================
-    - name: ▶️ Start application
+    - name:  Start application
       run: |
         # Démarrer le conteneur de l'API
         docker run -d --name micro-app-api -p 8000:8000 micro-app:latest
         
         # Attendre que l'API soit prête
-        echo "⏳ Attente du démarrage de l'API..."
+        echo " Attente du démarrage de l'API..."
         sleep 20
         
         # Vérifier que l'API fonctionne
         if curl -s -f http://localhost:8000/ > /dev/null; then
-          echo "✅ API démarrée avec succès sur http://localhost:8000"
+          echo " API démarrée avec succès sur http://localhost:8000"
         else
-          echo "⚠️ API non accessible, vérifiez les logs: docker logs micro-app-api"
+          echo " API non accessible, vérifiez les logs: docker logs micro-app-api"
         fi
 
     # =========================
     # 11. DAST - OWASP ZAP (CORRIGÉ)
     # =========================
-    - name: 🛡️ DAST - OWASP ZAP Scan
+    - name:  DAST - OWASP ZAP Scan
       continue-on-error: true
       run: |
-        echo "🛡️ Démarrage du scan DAST avec OWASP ZAP..."
+        echo " Démarrage du scan DAST avec OWASP ZAP..."
         
         # Créer un dossier pour les rapports ZAP
         mkdir -p zap-reports
         
         # Vérifier que l'API est accessible
         if ! curl -s http://localhost:8000/ > /dev/null 2>&1; then
-          echo "⚠️ API non accessible, arrêt du scan DAST"
+          echo " API non accessible, arrêt du scan DAST"
           exit 0
         fi
         
@@ -175,24 +175,24 @@ jobs:
     - name: 📊 Generate Security Dashboard
       if: always()
       run: |
-        echo "# 🛡️ RAPPORT DE SÉCURITÉ DEVSECOPS" > security-dashboard.md
+        echo "#  RAPPORT DE SÉCURITÉ DEVSECOPS" > security-dashboard.md
         echo "## Projet: projet_devsecops" >> security-dashboard.md
         echo "## Date: $(date)" >> security-dashboard.md
-        echo "## Pipeline: ✅ SUCCÈS" >> security-dashboard.md
+        echo "## Pipeline:  SUCCÈS" >> security-dashboard.md
         echo "" >> security-dashboard.md
         
-        echo "### 📊 Résultats des Scans :" >> security-dashboard.md
+        echo "###  Résultats des Scans :" >> security-dashboard.md
         echo "" >> security-dashboard.md
         
         # Tests unitaires
-        echo "#### 🧪 Tests Unitaires (pytest)" >> security-dashboard.md
-        echo "- ✅ 7 tests passés sur 7" >> security-dashboard.md
+        echo "####  Tests Unitaires (pytest)" >> security-dashboard.md
+        echo "-  7 tests passés sur 7" >> security-dashboard.md
         echo "" >> security-dashboard.md
         
         # Bandit
         if [ -f bandit-report.json ]; then
           BANDIT_ISSUES=$(jq '.results | length' bandit-report.json 2>/dev/null || echo "11")
-          echo "#### 🛡️ SAST - Bandit" >> security-dashboard.md
+          echo "####  SAST - Bandit" >> security-dashboard.md
           echo "- Issues trouvées: $BANDIT_ISSUES" >> security-dashboard.md
           echo "- Fichier: bandit-report.json" >> security-dashboard.md
           echo "" >> security-dashboard.md
@@ -209,7 +209,7 @@ jobs:
         
         # Trivy
         if [ -f trivy-report.sarif ]; then
-          echo "#### 🐳 Container - Trivy" >> security-dashboard.md
+          echo "####  Container - Trivy" >> security-dashboard.md
           echo "- Scan terminé avec succès" >> security-dashboard.md
           echo "- Fichier: trivy-report.sarif" >> security-dashboard.md
           echo "" >> security-dashboard.md
@@ -217,13 +217,13 @@ jobs:
         
         # ZAP
         if [ -f zap-reports/zap-report.html ]; then
-          echo "#### 🔍 DAST - OWASP ZAP" >> security-dashboard.md
+          echo "####  DAST - OWASP ZAP" >> security-dashboard.md
           echo "- Scan de sécurité dynamique terminé" >> security-dashboard.md
           echo "- Rapport HTML: zap-reports/zap-report.html" >> security-dashboard.md
           echo "" >> security-dashboard.md
         fi
         
-        echo "### ✅ Tous les outils de sécurité ont été exécutés avec succès !" >> security-dashboard.md
+        echo "###  Tous les outils de sécurité ont été exécutés avec succès !" >> security-dashboard.md
         echo "" >> security-dashboard.md
         
         echo "### 🔧 Prochaines étapes recommandées :" >> security-dashboard.md
@@ -242,7 +242,7 @@ jobs:
     # =========================
     # 13. Upload Reports
     # =========================
-    - name: 📤 Upload security reports
+    - name:  Upload security reports
       uses: actions/upload-artifact@v4
       with:
         name: security-reports
@@ -251,7 +251,7 @@ jobs:
           safety-report.txt
           safety-scan.json
           trivy-report.sarif
-          zap-reports/
+          zap-reports/** 
           security-dashboard.md
           sonarcloud-status.json
         retention-days: 7
@@ -259,7 +259,7 @@ jobs:
     # =========================
     # 14. Cleanup
     # =========================
-    - name: 🧹 Cleanup
+    - name: Cleanup
       if: always()
       run: |
         # Arrêter et supprimer le conteneur API
@@ -269,4 +269,4 @@ jobs:
         # Nettoyer les images non utilisées
         docker system prune -f 2>/dev/null || true
         
-        echo "🧹 Nettoyage terminé"
+        echo " Nettoyage terminé"
