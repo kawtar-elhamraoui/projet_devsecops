@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # API à tester
+  api-under-test:
+    build: 
+      context: ./micro_app
+      dockerfile: Dockerfile
+    container_name: api-dast-target
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=testing
+      - PYTHONUNBUFFERED=1
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # OWASP ZAP pour le scanning
+  zap-scanner:
+    image: owasp/zap2docker-stable
+    container_name: zap-scanner
+    ports:
+      - "8080:8080"  # Interface web ZAP
+    volumes:
+      - ./security-scans/dast:/zap/wrk:rw
+      - ./configs/zap:/zap/config:ro
+    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+    depends_on:
+      api-under-test:
+        condition: service_healthy
+
+  # Nuclei pour tests supplémentaires
+  nuclei-scanner:
+    image: projectdiscovery/nuclei:latest
+    container_name: nuclei-scanner
+    volumes:
+      - ./security-scans/dast:/reports
+      - ./configs/nuclei-templates:/templates:ro
+    command: >
+      sh -c "
+      echo 'Attente du démarrage de l API...' &&
+      sleep 30 &&
+      nuclei -u http://api-under-test:8000 
+        -t /templates/
+        -o /reports/nuclei-report.json 
+        -severity medium,high,critical
+      "
+    depends_on:
+      api-under-test:
+        condition: service_healthy
+
+volumes:
+  zap-sessions:
+  scan-reports:

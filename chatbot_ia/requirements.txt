@@ -13,3 +13,4 @@ fastembed==0.3.0
 pydantic==1.10.13
 typing-extensions==4.7.1
 aiohttp==3.8.5
+sentence-transformers==2.2.2

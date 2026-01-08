@@ -1,0 +1,20 @@
+id: devsecops-api-tests
+info:
+  name: DevSecOps API Security Tests
+  author: votre-nom
+  severity: medium
+  description: Tests personnalisés pour l'API DevSecOps
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/search/test"
+      - "{{BaseURL}}/test/vulnerable"
+    
+    matchers-condition: and
+    matchers:
+      - type: word
+        words:
+          - "SQL"
+          - "VULNÉRABLE"
+        condition: or

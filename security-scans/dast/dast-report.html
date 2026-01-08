@@ -1,0 +1,281 @@
+
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Rapport DAST - Projet DevSecOps</title>
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    background-color: #f5f5f5;
+                    padding: 20px;
+                }
+                
+                .container {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    background: white;
+                    border-radius: 10px;
+                    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+                    padding: 30px;
+                }
+                
+                header {
+                    text-align: center;
+                    margin-bottom: 40px;
+                    padding-bottom: 20px;
+                    border-bottom: 2px solid #eaeaea;
+                }
+                
+                h1 {
+                    color: #2c3e50;
+                    margin-bottom: 10px;
+                }
+                
+                .subtitle {
+                    color: #7f8c8d;
+                    font-size: 1.1em;
+                }
+                
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 20px;
+                    margin-bottom: 30px;
+                }
+                
+                .stat-card {
+                    background: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    text-align: center;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                }
+                
+                .stat-number {
+                    font-size: 2.5em;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                }
+                
+                .critical { color: #e74c3c; }
+                .high { color: #e67e22; }
+                .medium { color: #f1c40f; }
+                .low { color: #3498db; }
+                .safe { color: #2ecc71; }
+                
+                .vuln-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 20px;
+                }
+                
+                .vuln-table th {
+                    background: #34495e;
+                    color: white;
+                    padding: 12px;
+                    text-align: left;
+                }
+                
+                .vuln-table td {
+                    padding: 12px;
+                    border-bottom: 1px solid #ddd;
+                }
+                
+                .vuln-table tr:nth-child(even) {
+                    background: #f8f9fa;
+                }
+                
+                .status-badge {
+                    display: inline-block;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-size: 0.8em;
+                    font-weight: bold;
+                }
+                
+                .vulnerable { background: #ffebee; color: #c62828; }
+                .safe { background: #e8f5e9; color: #2e7d32; }
+                
+                .severity-badge {
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                    color: white;
+                }
+                
+                .critical-badge { background: #c62828; }
+                .high-badge { background: #ef6c00; }
+                .medium-badge { background: #f9a825; }
+                .low-badge { background: #1565c0; }
+                
+                footer {
+                    margin-top: 40px;
+                    text-align: center;
+                    color: #7f8c8d;
+                    font-size: 0.9em;
+                    padding-top: 20px;
+                    border-top: 1px solid #eaeaea;
+                }
+                
+                .info-box {
+                    background: #e3f2fd;
+                    border-left: 4px solid #2196f3;
+                    padding: 15px;
+                    margin: 20px 0;
+                    border-radius: 4px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <header>
+                    <h1>🔍 Rapport DAST - Projet DevSecOps</h1>
+                    <p class="subtitle">Scan dynamique de sécurité - 08/01/2026 13:13</p>
+                </header>
+                
+                <div class="info-box">
+                    <strong>📌 Note importante :</strong> 
+                    Ces vulnérabilités sont <strong>intentionnelles</strong> et font partie 
+                    de la démonstration pédagogique du projet DevSecOps.
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">4</div>
+                        <div>Vulnérabilités trouvées</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number critical">2</div>
+                        <div>Critiques</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number high">1</div>
+                        <div>Élevées</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number medium">1</div>
+                        <div>Moyennes</div>
+                    </div>
+                </div>
+                
+                <h2>📋 Informations du scan</h2>
+                <table style="width: 100%; margin-bottom: 30px;">
+                    <tr>
+                        <td><strong>URL cible :</strong></td>
+                        <td>http://localhost:8000</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Date du scan :</strong></td>
+                        <td>2026-01-08T13:12:58.896191</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Total tests :</strong></td>
+                        <td>6</td>
+                    </tr>
+                </table>
+                
+                <h2>⚠️ Vulnérabilités détectées</h2>
+                <table class="vuln-table">
+                    <thead>
+                        <tr>
+                            <th>Test</th>
+                            <th>Endpoint</th>
+                            <th>Sévérité</th>
+                            <th>Statut</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        
+                        <tr>
+                            <td><strong>Basic SQL Injection</strong></td>
+                            <td><code>/search/{payload}</code></td>
+                            <td><span class="severity-badge high-badge">HIGH</span></td>
+                            <td><span class="status-badge vulnerable">VULNERABLE</span></td>
+                            <td>Vulnérabilité intentionnelle pour démonstration SAST/DAST</td>
+                        </tr>
+            
+                        <tr>
+                            <td><strong>Union-Based SQLi</strong></td>
+                            <td><code>/search/{payload}</code></td>
+                            <td><span class="severity-badge high-badge">HIGH</span></td>
+                            <td><span class="status-badge safe">SAFE</span></td>
+                            <td>Vulnérabilité intentionnelle pour démonstration SAST/DAST</td>
+                        </tr>
+            
+                        <tr>
+                            <td><strong>Comment-Based SQLi</strong></td>
+                            <td><code>/search/{payload}</code></td>
+                            <td><span class="severity-badge medium-badge">MEDIUM</span></td>
+                            <td><span class="status-badge vulnerable">VULNERABLE</span></td>
+                            <td>Vulnérabilité intentionnelle pour démonstration SAST/DAST</td>
+                        </tr>
+            
+                        <tr>
+                            <td><strong>Basic Command Execution</strong></td>
+                            <td><code>/run/{payload}</code></td>
+                            <td><span class="severity-badge critical-badge">CRITICAL</span></td>
+                            <td><span class="status-badge vulnerable">VULNERABLE</span></td>
+                            <td>Commande exécutée avec succès - Vulnérabilité intentionnelle</td>
+                        </tr>
+            
+                        <tr>
+                            <td><strong>System Command</strong></td>
+                            <td><code>/run/{payload}</code></td>
+                            <td><span class="severity-badge critical-badge">CRITICAL</span></td>
+                            <td><span class="status-badge vulnerable">VULNERABLE</span></td>
+                            <td>Commande exécutée avec succès - Vulnérabilité intentionnelle</td>
+                        </tr>
+            
+                        <tr>
+                            <td><strong>Unsafe Pickle Deserialization</strong></td>
+                            <td><code>/load_data</code></td>
+                            <td><span class="severity-badge critical-badge">CRITICAL</span></td>
+                            <td><span class="status-badge safe">SAFE</span></td>
+                            <td>Pickle utilisé avec données utilisateur - Très dangereux</td>
+                        </tr>
+            
+                    </tbody>
+                </table>
+                
+                <h2>🎓 Contexte pédagogique</h2>
+                <div class="info-box">
+                    <p><strong>Objectif du projet :</strong> Démontrer l'intégration de la sécurité dans le DevOps</p>
+                    <p><strong>Vulnérabilités intentionnelles :</strong> Oui, pour l'apprentissage et la démonstration SAST/DAST</p>
+                    <p><strong>Comparaison :</strong> Endpoints vulnérables vs endpoints sécurisés (préfixe /secure/)</p>
+                </div>
+                
+                <h2>🛡️ Recommandations de sécurité</h2>
+                <ul style="margin-left: 20px; margin-bottom: 30px;">
+                    <li>Utiliser des requêtes paramétrées pour éviter les injections SQL</li>
+                    <li>Ne jamais utiliser pickle.loads() avec des données non fiables</li>
+                    <li>Valider et échapper toutes les entrées utilisateur</li>
+                    <li>Utiliser subprocess.run() avec shell=False</li>
+                    <li>Implémenter un WAF (Web Application Firewall)</li>
+                </ul>
+                
+                <h2>🔗 Liens utiles</h2>
+                <ul style="margin-left: 20px;">
+                    <li><a href="https://sonarcloud.io/project/overview?id=kwtar-elhai_projet_devsecops" target="_blank">SonarCloud (SAST)</a></li>
+                    <li><a href="https://owasp.org/www-project-top-ten/" target="_blank">OWASP Top 10</a></li>
+                    <li><a href="https://cheatsheetseries.owasp.org/" target="_blank">OWASP Cheat Sheets</a></li>
+                </ul>
+                
+                <footer>
+                    <p>Rapport généré automatiquement par le scanner DAST du projet DevSecOps</p>
+                    <p>Projet académique - Intégration de la sécurité à l'approche DevOps</p>
+                </footer>
+            </div>
+        </body>
+        </html>
+        

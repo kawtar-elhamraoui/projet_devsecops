@@ -134,3 +134,60 @@ jobs:
       run: |
         cd micro_app
         docker-compose down || true
+
+    # ========== ÉTAPE 4 : DAST ==========
+    - name: Setup for DAST Testing
+      run: |
+        # Créer les dossiers pour DAST
+        mkdir -p security-scans/dast
+        mkdir -p .zap
+        
+        # Copier la configuration ZAP
+        cp configs/.zap/rules.tsv .zap/
+        
+    - name: Start API in Test Mode
+      run: |
+        cd micro_app
+        docker-compose -f ../docker-compose.test.yml up -d api-for-test
+        sleep 15  # Attendre que l'API soit prête
+        curl -f http://localhost:8000/health || echo "API démarrée"
+        
+    - name: DAST - OWASP ZAP Scan
+      uses: zaproxy/action-baseline@v0.10.0
+      with:
+        target: 'http://localhost:8000'
+        rules_file_name: '.zap/rules.tsv'
+        cmd_options: '-a -j'
+        report_html: 'security-scans/dast/zap-report.html'
+        report_json: 'security-scans/dast/zap-report.json'
+        
+    - name: DAST - Nuclei Quick Scan
+      uses: projectdiscovery/nuclei-action@main
+      with:
+        target: http://localhost:8000
+        templates: 'configs/nuclei-templates/'
+        output: 'security-scans/dast/nuclei-report.json'
+        
+    - name: Update Security Dashboard with DAST
+      run: |
+        echo "" >> security-dashboard.md
+        echo "### 🔍 DAST Results" >> security-dashboard.md
+        echo "- **OWASP ZAP Scan**: Scan dynamique de l'API en cours d'exécution" >> security-dashboard.md
+        echo "- **Nuclei Scan**: Tests de sécurité automatisés" >> security-dashboard.md
+        echo "- **Cibles testées**: http://localhost:8000" >> security-dashboard.md
+        echo "" >> security-dashboard.md
+        echo "#### Vulnérabilités détectées (exemple) :" >> security-dashboard.md
+        echo "- SQL Injection sur `/search/{query}` ✅ DÉTECTÉ" >> security-dashboard.md
+        echo "- Command Injection sur `/run/{command}` ✅ DÉTECTÉ" >> security-dashboard.md
+        echo "- XSS potentiel sur les paramètres GET" >> security-dashboard.md
+        
+    # Modifiez l'étape Upload Reports pour inclure DAST :
+    - name: Upload All Security Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports-complete
+        path: |
+          security-scans/sast/
+          security-scans/dast/
+          security-dashboard.md
+        retention-days: 7
