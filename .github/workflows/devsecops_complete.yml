@@ -398,7 +398,7 @@ jobs:
         fi
         
         echo ""
-        echo "✅ SECURITY GATE PASSED"
+        echo " SECURITY GATE PASSED"
         echo "Aucune vulnérabilité critique détectée"
 
     # =========================
