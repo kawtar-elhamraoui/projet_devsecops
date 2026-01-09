@@ -145,7 +145,7 @@ jobs:
         
         echo "✅ Active testing completed - ZAP ready for scanning"
     # =========================
-    # 11. DAST - OWASP ZAP (VERSION 100% FONCTIONNELLE - API REST)
+    # 11. DAST - OWASP ZAP (VERSION CORRIGÉE - SCAN EXPLICITE)
     # =========================
     - name: DAST - OWASP ZAP
       continue-on-error: true
@@ -186,43 +186,109 @@ jobs:
         fi
         
         echo "✅ API accessible, lancement du scan..."
+        echo ""
         
-        # Phase 1: Spider (découverte des endpoints)
-        echo "🕷️ Phase 1: Spider scan..."
-        SPIDER_SCAN_ID=$(curl -s "$ZAP_API/JSON/spider/action/scan/?url=$API_URL" | jq -r '.scan' 2>/dev/null || echo "0")
-        echo "Spider scan ID: $SPIDER_SCAN_ID"
+        # ========== NOUVELLE APPROCHE : AJOUTER LES URLs MANUELLEMENT ==========
+        echo "📍 Étape 1: Enregistrement des endpoints vulnérables dans ZAP..."
         
-        # Attendre la fin du spider (max 60s)
-        for i in {1..12}; do
-          SPIDER_STATUS=$(curl -s "$ZAP_API/JSON/spider/view/status/?scanId=$SPIDER_SCAN_ID" | jq -r '.status' 2>/dev/null || echo "100")
-          echo "Spider progression: $SPIDER_STATUS%"
-          [ "$SPIDER_STATUS" = "100" ] && break
-          sleep 5
+        # Liste des URLs vulnérables à scanner
+        VULN_URLS=(
+          "$API_URL/"
+          "$API_URL/health"
+          "$API_URL/vuln1/sql/search?username=test"
+          "$API_URL/vuln1/sql/union?search=test"
+          "$API_URL/vuln2/cmd/ping?host=127.0.0.1"
+          "$API_URL/vuln3/xxe/parse"
+          "$API_URL/vuln4/file/read?filename=test.txt"
+          "$API_URL/vuln/test-all"
+        )
+        
+        # Accéder à chaque URL pour que ZAP les enregistre
+        echo "  → Enregistrement de ${#VULN_URLS[@]} URLs..."
+        for url in "${VULN_URLS[@]}"; do
+          echo "    • Accessing: $url"
+          curl -s "$url" > /dev/null 2>&1 || true
+          sleep 1
         done
         
-        echo "✅ Spider terminé"
+        echo "  ✅ URLs enregistrées dans l'historique ZAP"
+        echo ""
         
-        # Phase 2: Passive Scan (analyse passive des réponses)
-        echo "🔍 Phase 2: Passive scan..."
+        # Vérifier les URLs dans le contexte ZAP
+        URLS_COUNT=$(curl -s "$ZAP_API/JSON/core/view/urls/" | jq '.urls | length' 2>/dev/null || echo 0)
+        echo "  📊 ZAP a maintenant $URLS_COUNT URLs dans son historique"
+        echo ""
+        
+        # ========== PHASE 1: SPIDER (avec contexte) ==========
+        echo "🕷️ Phase 1: Spider scan (découverte)..."
+        SPIDER_SCAN_ID=$(curl -s "$ZAP_API/JSON/spider/action/scan/?url=$API_URL&maxChildren=10&recurse=true" | jq -r '.scan' 2>/dev/null || echo "0")
+        echo "  Spider scan ID: $SPIDER_SCAN_ID"
+        
+        if [ "$SPIDER_SCAN_ID" != "0" ]; then
+          for i in {1..12}; do
+            SPIDER_STATUS=$(curl -s "$ZAP_API/JSON/spider/view/status/?scanId=$SPIDER_SCAN_ID" | jq -r '.status' 2>/dev/null || echo "100")
+            echo "  Spider progression: $SPIDER_STATUS%"
+            [ "$SPIDER_STATUS" = "100" ] && break
+            sleep 5
+          done
+        fi
+        
+        echo "  ✅ Spider terminé"
+        echo ""
+        
+        # ========== PHASE 2: PASSIVE SCAN ==========
+        echo "🔍 Phase 2: Passive scan (analyse des réponses)..."
+        sleep 10
+        echo "  ✅ Passive scan terminé"
+        echo ""
+        
+        # ========== PHASE 3: ACTIVE SCAN sur CHAQUE URL VULNÉRABLE ==========
+        echo "⚡ Phase 3: Active scan (tests actifs)..."
+        
+        # Scanner chaque endpoint vulnérable individuellement
+        SCAN_IDS=()
+        
+        for url in "${VULN_URLS[@]}"; do
+          echo "  → Scanning: $url"
+          SCAN_ID=$(curl -s "$ZAP_API/JSON/ascan/action/scan/?url=$url&recurse=false&inScopeOnly=false" | jq -r '.scan' 2>/dev/null || echo "0")
+          
+          if [ "$SCAN_ID" != "0" ]; then
+            SCAN_IDS+=("$SCAN_ID")
+            echo "    Scan ID: $SCAN_ID"
+          fi
+        done
+        
+        echo ""
+        echo "  Active scans lancés: ${#SCAN_IDS[@]}"
+        echo ""
+        
+        # Attendre que tous les scans soient terminés
+        echo "  ⏳ Attente de la fin des scans actifs..."
         sleep 10
         
-        # Phase 3: Active Scan (tests actifs de vulnérabilités)
-        echo "⚡ Phase 3: Active scan..."
-        ACTIVE_SCAN_ID=$(curl -s "$ZAP_API/JSON/ascan/action/scan/?url=$API_URL&recurse=true" | jq -r '.scan' 2>/dev/null || echo "0")
-        echo "Active scan ID: $ACTIVE_SCAN_ID"
-        
-        # Attendre la fin du scan actif (max 120s)
-        for i in {1..24}; do
-          ACTIVE_STATUS=$(curl -s "$ZAP_API/JSON/ascan/view/status/?scanId=$ACTIVE_SCAN_ID" | jq -r '.status' 2>/dev/null || echo "100")
-          echo "Active scan progression: $ACTIVE_STATUS%"
-          [ "$ACTIVE_STATUS" = "100" ] && break
-          sleep 5
+        for scan_id in "${SCAN_IDS[@]}"; do
+          for i in {1..20}; do
+            STATUS=$(curl -s "$ZAP_API/JSON/ascan/view/status/?scanId=$scan_id" | jq -r '.status' 2>/dev/null || echo "100")
+            
+            if [ "$STATUS" = "100" ]; then
+              echo "  ✅ Scan $scan_id terminé"
+              break
+            fi
+            
+            if [ $i -eq 1 ] || [ $((i % 5)) -eq 0 ]; then
+              echo "  Scan $scan_id: $STATUS%"
+            fi
+            
+            sleep 3
+          done
         done
         
-        echo "✅ Active scan terminé"
+        echo ""
+        echo "  ✅ Tous les active scans terminés"
         sleep 5
+        echo ""
         
-        # Générer les rapports via l'API REST
+        # ========== GÉNÉRATION DES RAPPORTS ==========
         echo "📊 Génération des rapports..."
         
         # 1. Rapport HTML
@@ -241,7 +307,7 @@ jobs:
         curl -s "$ZAP_API/OTHER/core/other/xmlreport/" \
           -o zap-reports/zap-report.xml
         
-        # 4. Résumé des alertes par niveau de risque
+        # 4. Résumé des alertes
         echo "  → Résumé des alertes..."
         curl -s "$ZAP_API/JSON/core/view/alertsSummary/" \
           | jq '.' > zap-reports/alerts-summary.json 2>/dev/null || \
@@ -252,7 +318,7 @@ jobs:
         echo "📁 Rapports générés:"
         ls -lh zap-reports/
         
-        # Créer un résumé lisible
+        # ========== AFFICHAGE DES RÉSULTATS ==========
         echo ""
         echo "📈 Résumé du scan DAST:"
         
@@ -270,18 +336,25 @@ jobs:
           echo "  🔵 Informational: $INFO_COUNT"
           echo "  📊 Total: $TOTAL alertes"
           
-          # Afficher les alertes High si présentes
+          # Afficher les alertes High/Medium si présentes
           if [ "$HIGH_COUNT" -gt 0 ]; then
             echo ""
-            echo "⚠️ Vulnérabilités High détectées:"
+            echo "🚨 Vulnérabilités High détectées:"
             jq -r '.alerts[] | select(.risk=="High") | "  - \(.name) (\(.count) instance(s))"' \
+              zap-reports/zap-report.json 2>/dev/null || echo "  (Voir le rapport pour détails)"
+          fi
+          
+          if [ "$MEDIUM_COUNT" -gt 0 ]; then
+            echo ""
+            echo "⚠️ Vulnérabilités Medium détectées:"
+            jq -r '.alerts[] | select(.risk=="Medium") | "  - \(.name) (\(.count) instance(s))"' \
               zap-reports/zap-report.json 2>/dev/null || echo "  (Voir le rapport pour détails)"
           fi
         else
           echo "  ⚠️ Aucun rapport JSON généré"
         fi
         
-        # Créer une page index HTML pour faciliter la navigation
+        # Créer la page index HTML (inchangé)
         cat > zap-reports/index.html <<'INDEXEOF'
         <!DOCTYPE html>
         <html lang="fr">
