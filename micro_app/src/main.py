@@ -264,6 +264,224 @@ def api_test():
             "/items - Gestion items"
         ]
     }
+# ========== AJOUTEZ CES IMPORTS EN HAUT DU FICHIER (après les autres imports) ==========
+from fastapi import Response
+import xml.etree.ElementTree as ET
+
+# ========== AJOUTEZ CES ENDPOINTS AVANT "if __name__ == '__main__':" ==========
+
+# ==========================================
+# ENDPOINTS DAST-FRIENDLY (Version Améliorée)
+# ==========================================
+
+@app.get("/vuln1/sql/search")
+def sql_injection_dast_friendly(username: str):
+    """⚠️ SQL Injection - Version DÉTECTABLE par DAST
+    
+    Expose les erreurs SQL pour que ZAP puisse les détecter
+    """
+    conn = sqlite3.connect("test.db")
+    
+    try:
+        # VULNÉRABLE : concaténation directe
+        query = f"SELECT * FROM products WHERE name = '{username}'"
+        cursor = conn.execute(query)
+        results = cursor.fetchall()
+        conn.close()
+        
+        return {
+            "query": query,  # ⚠️ Exposer la requête aide DAST
+            "results": results,
+            "count": len(results),
+            "warning": "⚠️ SQL Injection vulnerability - DEMO"
+        }
+    
+    except sqlite3.Error as e:
+        # ⚠️ CRITIQUE : Exposer l'erreur SQL
+        conn.close()
+        return Response(
+            content=f'{{"error": "{str(e)}", "query": "{query}", "type": "SQL Error"}}',
+            status_code=500,
+            media_type="application/json"
+        )
+
+
+@app.get("/vuln1/sql/union")
+def sql_union_injection(search: str):
+    """⚠️ SQL Injection - Test UNION-based pour DAST"""
+    conn = sqlite3.connect("test.db")
+    
+    try:
+        # VULNÉRABLE : permet UNION attacks
+        query = f"SELECT name, price FROM products WHERE name LIKE '%{search}%'"
+        cursor = conn.execute(query)
+        results = cursor.fetchall()
+        conn.close()
+        
+        formatted_results = [
+            {"name": r[0], "price": r[1]} for r in results
+        ]
+        
+        return {
+            "query": query,
+            "results": formatted_results,
+            "columns": ["name", "price"],  # Info pour DAST
+            "warning": "⚠️ UNION-based SQL Injection - DEMO"
+        }
+    
+    except sqlite3.Error as e:
+        conn.close()
+        return Response(
+            content=f'{{"error": "{str(e)}", "sql_query": "{query}"}}',
+            status_code=500,
+            media_type="application/json"
+        )
+
+
+@app.get("/vuln2/cmd/ping")
+def command_injection_dast_friendly(host: str):
+    """⚠️ Command Injection - Version DÉTECTABLE par DAST
+    
+    Retourne stdout/stderr complets pour que ZAP voit l'injection
+    """
+    try:
+        # VULNÉRABLE : shell=True avec input utilisateur
+        command = f"ping -c 1 {host}"
+        result = subprocess.run(
+            command,
+            shell=True,  # ⚠️ DANGER
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        # ⚠️ Exposer tout le output
+        return {
+            "command": command,
+            "stdout": result.stdout,  # ZAP verra l'injection ici
+            "stderr": result.stderr,
+            "returncode": result.returncode,
+            "warning": "⚠️ Command Injection - DEMO"
+        }
+    
+    except subprocess.TimeoutExpired:
+        return {
+            "error": "Command execution timed out",
+            "command": command,
+            "timeout": 5
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "command": command
+        }
+
+
+@app.post("/vuln3/xxe/parse")
+def xxe_injection_dast_friendly(xml_data: str):
+    """⚠️ XXE (XML External Entity) - DÉTECTABLE par DAST"""
+    try:
+        # VULNÉRABLE : parse XML sans protection XXE
+        root = ET.fromstring(xml_data)
+        
+        result = {
+            "tag": root.tag,
+            "text": root.text,
+            "attribs": root.attrib,
+            "children": [
+                {"tag": child.tag, "text": child.text} 
+                for child in root
+            ],
+            "warning": "⚠️ XXE vulnerability - DEMO"
+        }
+        
+        return result
+    
+    except ET.ParseError as e:
+        return Response(
+            content=f'{{"error": "XML Parse Error: {str(e)}"}}',
+            status_code=400,
+            media_type="application/json"
+        )
+    except Exception as e:
+        return {
+            "error": str(e),
+            "type": "XXE Processing Error"
+        }
+
+
+@app.get("/vuln4/file/read")
+def path_traversal_dast_friendly(filename: str):
+    """⚠️ Path Traversal - DÉTECTABLE par DAST"""
+    try:
+        # VULNÉRABLE : pas de validation du chemin
+        base_path = "./uploads/"
+        file_path = base_path + filename  # Pas de sanitization !
+        
+        with open(file_path, 'r') as f:
+            content = f.read()
+        
+        return {
+            "filename": filename,
+            "path": file_path,
+            "content": content[:500],  # Premiers 500 chars
+            "size": len(content),
+            "warning": "⚠️ Path Traversal - DEMO"
+        }
+    
+    except FileNotFoundError:
+        return {
+            "error": f"File not found: {filename}",
+            "path": file_path,
+            "exists": False
+        }
+    except PermissionError:
+        return {
+            "error": f"Permission denied: {filename}",
+            "path": file_path
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "filename": filename,
+            "type": "File Read Error"
+        }
+
+
+@app.get("/vuln/test-all")
+def test_all_vulnerabilities():
+    """Endpoint de test pour vérifier que toutes les vulnérabilités sont accessibles"""
+    return {
+        "message": "All DAST-friendly vulnerable endpoints",
+        "endpoints": {
+            "sql_injection": {
+                "url": "/vuln1/sql/search?username=admin",
+                "test": "/vuln1/sql/search?username=admin' OR '1'='1--",
+                "description": "SQL Injection with error exposure"
+            },
+            "sql_union": {
+                "url": "/vuln1/sql/union?search=test",
+                "test": "/vuln1/sql/union?search=test' UNION SELECT 1,2--",
+                "description": "UNION-based SQL Injection"
+            },
+            "command_injection": {
+                "url": "/vuln2/cmd/ping?host=google.com",
+                "test": "/vuln2/cmd/ping?host=google.com; whoami",
+                "description": "Command Injection with output"
+            },
+            "xxe": {
+                "url": "/vuln3/xxe/parse",
+                "test": "POST XML with XXE payload",
+                "description": "XML External Entity Injection"
+            },
+            "path_traversal": {
+                "url": "/vuln4/file/read?filename=test.txt",
+                "test": "/vuln4/file/read?filename=../../../etc/passwd",
+                "description": "Path Traversal"
+            }
+        },
+        "note": "⚠️ These endpoints are INTENTIONALLY vulnerable for DAST demonstration"
+    }
 
 if __name__ == "__main__":
     import uvicorn
