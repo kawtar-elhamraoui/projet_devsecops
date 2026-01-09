@@ -138,6 +138,38 @@ def health():
         "timestamp": datetime.now().isoformat()
     }
 
+# Dans micro_app/src/main.py, ajoutez UN SEUL endpoint :
+
+@app.get("/demo/dast/{input}")
+def dast_demo_endpoint(input: str):
+    """Endpoint spécial pour démontrer DAST"""
+    
+    # Réponse différente selon l'input
+    if input == "safe":
+        return {"status": "safe", "message": "Normal operation"}
+    
+    # Si l'input contient du SQL
+    elif "' OR '" in input:
+        return {
+            "status": "vulnerable",
+            "warning": "SQL_INJECTION_DETECTED",
+            "input": input,
+            "debug": "This would be dangerous in production!",
+            "risk": "HIGH"
+        }
+    
+    # Si l'input contient des commandes
+    elif ";" in input or "&&" in input:
+        return {
+            "status": "vulnerable", 
+            "warning": "COMMAND_INJECTION_DETECTED",
+            "input": input,
+            "debug": "Shell commands detected!",
+            "risk": "CRITICAL"
+        }
+    
+    return {"status": "processed", "input": input}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
