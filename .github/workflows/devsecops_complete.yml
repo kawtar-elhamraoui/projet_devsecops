@@ -110,100 +110,296 @@ jobs:
         sleep 15
         curl -f http://localhost:8000 || echo "API non accessible"
 
+  # Section DAST corrigée à remplacer dans votre workflow
+
     # =========================
-# 11. DAST - OWASP ZAP (CORRIGÉ)
-# =========================
+    # 11. DAST - OWASP ZAP (VERSION CORRIGÉE)
+    # =========================
     - name: DAST - OWASP ZAP
       continue-on-error: true
       run: |
         echo "🔍 Démarrage du scan DAST avec OWASP ZAP..."
         mkdir -p zap-reports
         
-        # Utiliser l'image officielle corrigée
+        # Démarrer ZAP en daemon
         docker run --rm -d \
-          -p $ZAP_PORT:$ZAP_PORT \
           --name zap \
-          ghcr.io/zaproxy/zaproxy:stable zap.sh \
-          -daemon -host 0.0.0.0 -port $ZAP_PORT \
-          -config api.disablekey=true
+          --network host \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap.sh -daemon -host 0.0.0.0 -port $ZAP_PORT \
+          -config api.disablekey=true \
+          -config api.addrs.addr.name=.* \
+          -config api.addrs.addr.regex=true
         
-        sleep 25
+        echo "Attente du démarrage de ZAP (30s)..."
+        sleep 30
         
-        # Attendre que l'API soit bien disponible
-        echo "Vérification de l'API..."
+        # Vérifier que ZAP est accessible
+        if ! curl -s http://localhost:$ZAP_PORT > /dev/null; then
+          echo "❌ ZAP n'a pas démarré correctement"
+          docker logs zap
+          exit 1
+        fi
+        
+        echo "✅ ZAP démarré avec succès"
+        
+        # Vérifier que l'API est accessible
         if curl -s $API_URL > /dev/null; then
           echo "✅ API accessible, lancement du scan..."
           
           # Spider pour découvrir les endpoints
-          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT spider $API_URL
+          echo "🕷️ Phase 1: Spider scan..."
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT \
+            spider $API_URL || echo "Spider terminé avec warnings"
+          
           sleep 10
           
-          # Scan actif rapide
-          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT active-scan $API_URL
+          # Scan actif
+          echo "🔍 Phase 2: Active scan..."
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT \
+            active-scan --recursive $API_URL || echo "Scan actif terminé avec warnings"
+          
           sleep 15
           
-          # Générer les rapports
-          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT report -o /zap/wrk/zap-report.html -f html
-          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT report -o /zap/wrk/zap-report.json -f json
+          # Attendre que le scan soit terminé
+          echo "⏳ Attente de la fin du scan..."
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT \
+            status || true
           
-          # Copier les rapports
-          docker cp zap:/zap/wrk/zap-report.html zap-reports/
-          docker cp zap:/zap/wrk/zap-report.json zap-reports/
+          sleep 10
+          
+          # Générer le rapport HTML
+          echo "📊 Génération du rapport HTML..."
+          docker exec zap curl -s "http://localhost:$ZAP_PORT/OTHER/core/other/htmlreport/" \
+            -o /zap/wrk/zap-report.html || echo "Erreur génération HTML"
+          
+          # Générer le rapport JSON
+          echo "📊 Génération du rapport JSON..."
+          docker exec zap curl -s "http://localhost:$ZAP_PORT/JSON/core/view/alerts/" \
+            -o /zap/wrk/zap-report.json || echo "Erreur génération JSON"
+          
+          # Générer un rapport XML (SARIF-like)
+          echo "📊 Génération du rapport XML..."
+          docker exec zap curl -s "http://localhost:$ZAP_PORT/OTHER/core/other/xmlreport/" \
+            -o /zap/wrk/zap-report.xml || echo "Erreur génération XML"
+          
+          # Copier tous les rapports
+          echo "📦 Copie des rapports..."
+          docker cp zap:/zap/wrk/zap-report.html zap-reports/ || echo "HTML non copié"
+          docker cp zap:/zap/wrk/zap-report.json zap-reports/ || echo "JSON non copié"
+          docker cp zap:/zap/wrk/zap-report.xml zap-reports/ || echo "XML non copié"
+          
+          # Créer un fichier index pour faciliter la navigation
+          cat > zap-reports/index.html <<'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>DAST Security Reports</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 40px; 
+                    background: #f5f5f5;
+                }
+                .container { 
+                    max-width: 800px; 
+                    margin: 0 auto; 
+                    background: white; 
+                    padding: 30px; 
+                    border-radius: 8px; 
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }
+                h1 { color: #333; border-bottom: 3px solid #007bff; padding-bottom: 10px; }
+                .report-link { 
+                    display: block; 
+                    padding: 15px; 
+                    margin: 10px 0; 
+                    background: #007bff; 
+                    color: white; 
+                    text-decoration: none; 
+                    border-radius: 5px;
+                    transition: background 0.3s;
+                }
+                .report-link:hover { background: #0056b3; }
+                .info { 
+                    background: #e7f3ff; 
+                    padding: 15px; 
+                    border-left: 4px solid #007bff; 
+                    margin: 20px 0;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔍 DAST Security Reports - OWASP ZAP</h1>
+                
+                <div class="info">
+                    <strong>Scan Date:</strong> $(date)<br>
+                    <strong>Target:</strong> $API_URL<br>
+                    <strong>Tool:</strong> OWASP ZAP
+                </div>
+        
+        <h2>📊 Available Reports</h2>
+        
+        <a href="zap-report.html" class="report-link" target="_blank">
+            📄 HTML Report (Detailed View)
+        </a>
+        
+        <a href="zap-report.json" class="report-link" target="_blank">
+            📋 JSON Report (Machine Readable)
+        </a>
+        
+        <a href="zap-report.xml" class="report-link" target="_blank">
+            📑 XML Report (Structured Data)
+        </a>
+        
+        <div class="info">
+            <strong>💡 Tip:</strong> Open the HTML report for the best visualization of vulnerabilities with severity ratings and remediation advice.
+        </div>
+            </div>
+        </body>
+        </html>
+        EOF
+                  
+          # Afficher un résumé des résultats
+          echo "📈 Résumé du scan:"
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT \
+            alerts -l High || echo "Pas d'alertes High"
           
           echo "✅ Scan DAST terminé avec succès"
+          ls -lah zap-reports/
+          
         else
-          echo "⚠️ API non accessible, scan DAST ignoré"
+          echo "⚠️ API non accessible à $API_URL"
+          echo "Le scan DAST sera ignoré"
         fi
         
-        # Arrêter ZAP
+        # Arrêter et nettoyer ZAP
+        echo "🧹 Nettoyage..."
         docker stop zap || true
+        docker rm zap || true
+
     # =========================
-    # 12. Generate Security Dashboard
+    # 12. Generate Security Dashboard (VERSION AMÉLIORÉE)
     # =========================
     - name: Generate Security Dashboard
       if: always()
       run: |
+        # Compteurs
         BANDIT=$(jq '.results | length' bandit-report.json 2>/dev/null || echo 0)
-        SAFETY=$(wc -l < safety-report.txt 2>/dev/null || echo 0)
-        ZAP_CRITICAL=$(grep -c '"risk":"Critical"' zap-reports/zap-report.json 2>/dev/null || echo 0)
+        SAFETY=$(grep -c "vulner" safety-report.txt 2>/dev/null || echo 0)
+        
+        # Analyser les résultats ZAP
+        if [ -f "zap-reports/zap-report.json" ]; then
+          ZAP_HIGH=$(jq '[.[] | select(.risk=="High")] | length' zap-reports/zap-report.json 2>/dev/null || echo 0)
+          ZAP_MEDIUM=$(jq '[.[] | select(.risk=="Medium")] | length' zap-reports/zap-report.json 2>/dev/null || echo 0)
+          ZAP_LOW=$(jq '[.[] | select(.risk=="Low")] | length' zap-reports/zap-report.json 2>/dev/null || echo 0)
+          ZAP_INFO=$(jq '[.[] | select(.risk=="Informational")] | length' zap-reports/zap-report.json 2>/dev/null || echo 0)
+        else
+          ZAP_HIGH=0
+          ZAP_MEDIUM=0
+          ZAP_LOW=0
+          ZAP_INFO=0
+        fi
 
         cat > security-dashboard.md <<EOF
-        # 🔒 Security Dashboard
+        # 🔒 Security Dashboard - DevSecOps Pipeline
 
-        **Bandit issues:** $BANDIT  
-        **Safety issues:** $SAFETY  
-        **ZAP Critical:** $ZAP_CRITICAL
+        **Date:** $(date)
+        **Pipeline Run:** #${{ github.run_number }}
+
+        ## 📊 Summary by Tool
+
+        ### SAST (Static Analysis)
+        - **Bandit Issues:** $BANDIT
+        - **Status:** $([ $BANDIT -eq 0 ] && echo "✅ Clean" || echo "⚠️ Issues Found")
+
+        ### SCA (Dependency Analysis)
+        - **Safety Vulnerabilities:** $SAFETY
+        - **Status:** $([ $SAFETY -eq 0 ] && echo "✅ Clean" || echo "⚠️ Vulnerable Dependencies")
+
+        ### DAST (Dynamic Analysis - OWASP ZAP)
+        - **🔴 High Risk:** $ZAP_HIGH
+        - **🟠 Medium Risk:** $ZAP_MEDIUM
+        - **🟡 Low Risk:** $ZAP_LOW
+        - **🔵 Informational:** $ZAP_INFO
+        - **Total Alerts:** $((ZAP_HIGH + ZAP_MEDIUM + ZAP_LOW + ZAP_INFO))
+        - **Status:** $([ $ZAP_HIGH -eq 0 ] && echo "✅ No Critical Issues" || echo "❌ Critical Issues Found")
+
+        ### Container Security (Trivy)
+        - **Status:** Check trivy-report.sarif for details
+
+        ## 🎯 Security Gate Status
+        $([ $ZAP_HIGH -eq 0 ] && echo "✅ **PASSED** - No critical vulnerabilities detected" || echo "❌ **FAILED** - Critical vulnerabilities require attention")
+
+        ## 📁 Available Reports
+        - **DAST HTML Report:** Download from artifacts and open \`zap-reports/index.html\`
+        - **DAST JSON Report:** \`zap-reports/zap-report.json\`
+        - **SAST Report:** \`bandit-report.json\`
+        - **SCA Report:** \`safety-report.txt\`
+        - **Container Report:** \`trivy-report.sarif\`
+
+        ## 🔗 Quick Links
+        - [View SonarCloud Results](https://sonarcloud.io/dashboard?id=kawtar-elhamraoui_projet_devsecops)
+        - [GitHub Actions Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+        ---
+        *Generated by DevSecOps Pipeline*
         EOF
 
     # =========================
-    # 13. Upload Artifacts
+    # 13. Upload Artifacts (VERSION AMÉLIORÉE)
     # =========================
     - name: Upload security reports
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: security-reports
+        name: security-reports-${{ github.run_number }}
         path: |
           bandit-report.json
           safety-report.txt
           trivy-report.sarif
-          zap-reports/**
+          zap-reports/
           security-dashboard.md
           sonarcloud-status.json
+        retention-days: 30
 
     # =========================
-    # 14. Security Gate
+    # 14. Security Gate (VERSION STRICTE)
     # =========================
     - name: Security Gate
       if: always()
       run: |
-        ZAP_CRITICAL=$(grep -c '"risk":"Critical"' zap-reports/zap-report.json 2>/dev/null || echo 0)
-
-        if [ "$ZAP_CRITICAL" -gt 0 ]; then
-          echo "❌ Pipeline bloqué : vulnérabilités critiques détectées"
+        echo "🚦 Évaluation du Security Gate..."
+        
+        # Vérifier les vulnérabilités critiques ZAP
+        if [ -f "zap-reports/zap-report.json" ]; then
+          ZAP_HIGH=$(jq '[.[] | select(.risk=="High")] | length' zap-reports/zap-report.json 2>/dev/null || echo 0)
+        else
+          ZAP_HIGH=0
+        fi
+        
+        # Vérifier Bandit
+        BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH")] | length' bandit-report.json 2>/dev/null || echo 0)
+        
+        echo "📊 Résultats du Security Gate:"
+        echo "  - ZAP High Risk: $ZAP_HIGH"
+        echo "  - Bandit High Severity: $BANDIT_HIGH"
+        
+        if [ "$ZAP_HIGH" -gt 0 ] || [ "$BANDIT_HIGH" -gt 0 ]; then
+          echo ""
+          echo "❌ SECURITY GATE FAILED"
+          echo "Des vulnérabilités critiques ont été détectées:"
+          [ "$ZAP_HIGH" -gt 0 ] && echo "  - $ZAP_HIGH vulnérabilités High dans DAST"
+          [ "$BANDIT_HIGH" -gt 0 ] && echo "  - $BANDIT_HIGH vulnérabilités High dans SAST"
+          echo ""
+          echo "📄 Consultez les rapports dans les artifacts pour plus de détails"
           exit 1
         fi
-
-        echo "✅ Security gate passed"
+        
+        echo ""
+        echo "✅ SECURITY GATE PASSED"
+        echo "Aucune vulnérabilité critique détectée"
 
     # =========================
     # 15. Cleanup
