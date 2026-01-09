@@ -37,7 +37,6 @@ jobs:
         cd micro_app
         pip install -r requirements.txt
         pip install pytest bandit safety jq
-
     # =========================
     # 4. Unit Tests
     # =========================
@@ -45,7 +44,6 @@ jobs:
       run: |
         cd micro_app
         python -m pytest tests/ -v || echo "Tests échoués mais pipeline continue"
-
     # =========================
     # 5. SAST - SonarCloud (SAFE MODE)
     # =========================
@@ -59,12 +57,10 @@ jobs:
           echo '{"status":"skipped"}' > sonarcloud-status.json
           exit 0
         fi
-
         curl -s \
           -H "Authorization: Bearer $SONAR_TOKEN" \
           "https://sonarcloud.io/api/qualitygates/project_status?projectKey=kawtar-elhamraoui_projet_devsecops" \
           -o sonarcloud-status.json || echo "{}" > sonarcloud-status.json
-
     # =========================
     # 6. SAST - Bandit
     # =========================
@@ -72,7 +68,6 @@ jobs:
       run: |
         cd micro_app
         bandit -r src -f json -o ../bandit-report.json || true
-
     # =========================
     # 7. SCA - Safety
     # =========================
@@ -80,7 +75,6 @@ jobs:
       run: |
         cd micro_app
         safety check -r requirements.txt --output text > ../safety-report.txt || true
-
     # =========================
     # 8. Build Docker Image
     # =========================
@@ -88,7 +82,6 @@ jobs:
       run: |
         cd micro_app
         docker build -t micro-app:latest .
-
     # =========================
     # 9. Container Scan - Trivy
     # =========================
@@ -109,41 +102,79 @@ jobs:
         docker run -d --name micro-app-api -p 8000:8000 micro-app:latest
         sleep 15
         curl -f http://localhost:8000 || echo "API non accessible"
-   # =========================
-    # 10.5. Test Active des Vulnérabilités (VERSION AMÉLIORÉE)
     # =========================
+# 10.5. Test Active des Vulnérabilités
+# =========================
     - name: Active Vulnerability Testing
       run: |
-        echo "🎯 Test actif de toutes les vulnérabilités - Version Améliorée..."
+        echo "🎯 Test actif de toutes les vulnérabilités..."
         
         # Attendre que l'API soit prête
-        echo "⏳ Waiting for API to be ready..."
         sleep 5
-        
-        # Vérifier que l'API répond
-        for i in {1..10}; do
-          if curl -s http://localhost:8000/health > /dev/null; then
-            echo "✅ API is responding!"
-            break
-          fi
-          echo "  Attempt $i/10..."
-          sleep 2
-        done
         
         # Installer requests pour les tests
         pip install requests
         
-        # Copier le script de test amélioré
-        cd micro_app
-        
-        # Exécuter le script de test amélioré
-        python3 test_all_vulns_improved.py
-        
-        echo ""
-        echo "⏳ Waiting 20 seconds for ZAP to capture and analyze requests..."
-        sleep 20
-        
-        echo "✅ Active testing completed - ZAP ready for scanning"
+        # Créer et exécuter un script de test complet
+        cat > test_all_vulns.py <<'PYEOF'
+          import requests
+          import time
+          import sys
+          API = "http://localhost:8000"
+          def test_endpoint(method, path, data=None, params=None):
+          """Test un endpoint et retourne la réponse"""
+          try:
+              if method == "GET":
+                  resp = requests.get(f"{API}{path}", params=params, timeout=3)
+              elif method == "POST":
+                  resp = requests.post(f"{API}{path}", data=data, timeout=3)
+              else:
+                  return None
+              return resp.status_code
+          except:
+              return None
+          # Tous les endpoints à tester avec des payloads malveillants
+          tests = [
+              # SQL Injection
+              ("GET", "/vuln1/sql/search", {"username": "admin' OR '1'='1 --"}),
+              ("GET", "/vuln1/sql/union", {"search": "test' UNION SELECT 1,2 --"}),
+              
+              # Command Injection
+              ("GET", "/vuln2/cmd/ping", {"host": "127.0.0.1; ls -la"}),
+              ("GET", "/vuln2/cmd/ping", {"host": "google.com && whoami"}),
+              
+              # Path Traversal
+              ("GET", "/vuln4/file/read", {"filename": "../../../etc/passwd"}),
+              ("GET", "/vuln4/file/read", {"filename": "/etc/shadow"}),
+              
+              # XXE
+              ("POST", "/vuln3/xxe/parse", {"xml_data": '''<?xml version="1.0"?>
+          <!DOCTYPE test [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+          <test>&xxe;</test>'''}),
+          ]
+          print("🚀 Starting active vulnerability tests...")
+          print("=" * 60)
+          for i, (method, path, payload) in enumerate(tests):
+              if isinstance(payload, dict):
+                  params = payload if method == "GET" else None
+                  data = payload if method == "POST" else None
+              else:
+                  params = {"data": payload} if method == "GET" else None
+                  data = {"data": payload} if method == "POST" else None
+              
+              status = test_endpoint(method, path, data, params)
+              print(f"Test {i+1}: {method} {path}")
+              print(f"  Payload: {str(payload)[:50]}...")
+              print(f"  Status: {status}")
+              print("-" * 40)
+              time.sleep(0.5)
+          print("=" * 60)
+          print("✅ All tests completed")
+          PYEOF
+              python3 test_all_vulns.py
+              
+              echo "⏳ Attente pour que ZAP capture les requêtes..."
+              sleep 15
     # =========================
     # 11. DAST - OWASP ZAP (VERSION 100% FONCTIONNELLE - API REST)
     # =========================
@@ -476,7 +507,6 @@ jobs:
         sleep 2
         docker stop zap 2>/dev/null || true
         docker rm zap 2>/dev/null || true
-
     # =========================
     # 12. Generate Security Dashboard (AVEC STATS ZAP)
     # =========================
@@ -508,41 +538,31 @@ jobs:
           ZAP_INFO=0
           ZAP_TOTAL=0
         fi
-
         # Générer le dashboard Markdown
         cat > security-dashboard.md <<EOF
         # 🔒 Security Dashboard - DevSecOps Pipeline
-
         **📅 Date:** $(date '+%Y-%m-%d %H:%M:%S')  
         **🔢 Pipeline Run:** #${{ github.run_number }}  
         **🌿 Branch:** ${{ github.ref_name }}  
         **👤 Triggered by:** ${{ github.actor }}
-
         ---
-
         ## 📊 Executive Summary
-
         | Security Tool | Total Issues | High | Medium | Low | Status |
         |--------------|--------------|------|--------|-----|--------|
         | **SAST (Bandit)** | $BANDIT_TOTAL | $BANDIT_HIGH | $BANDIT_MEDIUM | $BANDIT_LOW | $([ $BANDIT_HIGH -eq 0 ] && echo "✅" || echo "❌") |
         | **SCA (Safety)** | $SAFETY_ISSUES | - | - | - | $([ $SAFETY_ISSUES -eq 0 ] && echo "✅" || echo "⚠️") |
         | **DAST (OWASP ZAP)** | $ZAP_TOTAL | $ZAP_HIGH | $ZAP_MEDIUM | $ZAP_LOW | $([ $ZAP_HIGH -eq 0 ] && echo "✅" || echo "❌") |
-
         ---
-
         ## 🎯 Detailed Results
-
         ### 1️⃣ SAST - Static Application Security Testing (Bandit)
         - **Total Issues:** $BANDIT_TOTAL
         - **🔴 High Severity:** $BANDIT_HIGH
         - **🟠 Medium Severity:** $BANDIT_MEDIUM
         - **🟡 Low Severity:** $BANDIT_LOW
         - **Status:** $([ $BANDIT_HIGH -eq 0 ] && echo "✅ No critical issues" || echo "❌ $BANDIT_HIGH critical issues found")
-
         ### 2️⃣ SCA - Software Composition Analysis (Safety)
         - **Vulnerable Dependencies:** $SAFETY_ISSUES
         - **Status:** $([ $SAFETY_ISSUES -eq 0 ] && echo "✅ All dependencies are safe" || echo "⚠️ $SAFETY_ISSUES vulnerable dependencies detected")
-
         ### 3️⃣ DAST - Dynamic Application Security Testing (OWASP ZAP)
         - **Total Alerts:** $ZAP_TOTAL
         - **🔴 High Risk:** $ZAP_HIGH
@@ -550,15 +570,11 @@ jobs:
         - **🟡 Low Risk:** $ZAP_LOW
         - **🔵 Informational:** $ZAP_INFO
         - **Status:** $([ $ZAP_HIGH -eq 0 ] && echo "✅ No critical vulnerabilities" || echo "❌ $ZAP_HIGH critical vulnerabilities found")
-
         ### 4️⃣ Container Security (Trivy)
         - **Status:** ✅ Scan completed
         - **Details:** Check \`trivy-report.sarif\` for vulnerabilities in Docker image
-
         ---
-
         ## 🚦 Security Gate Status
-
         $(if [ $ZAP_HIGH -eq 0 ] && [ $BANDIT_HIGH -eq 0 ]; then
           echo "### ✅ **PASSED**"
           echo ""
@@ -572,11 +588,8 @@ jobs:
           echo ""
           echo "**Action Required:** Review and fix critical vulnerabilities before deployment."
         fi)
-
         ---
-
         ## 📁 Available Reports
-
         ### Download from Artifacts
         1. **DAST Reports** (OWASP ZAP)
            - 📄 \`zap-reports/index.html\` - **Start here!** Navigation dashboard
@@ -584,45 +597,31 @@ jobs:
            - 📋 \`zap-reports/zap-report.json\` - JSON for automation
            - 📑 \`zap-reports/zap-report.xml\` - XML structured data
            - 📈 \`zap-reports/alerts-summary.json\` - Quick summary
-
         2. **SAST Reports**
            - 📄 \`bandit-report.json\` - Bandit static analysis results
-
         3. **SCA Reports**
            - 📄 \`safety-report.txt\` - Safety dependency scan results
-
         4. **Container Security**
            - 📄 \`trivy-report.sarif\` - Trivy container scan (SARIF format)
-
         5. **SonarCloud**
            - 📄 \`sonarcloud-status.json\` - SonarCloud quality gate status
-
         ---
-
         ## 🔗 Quick Links
-
         - 🌐 [SonarCloud Dashboard](https://sonarcloud.io/dashboard?id=kawtar-elhamraoui_projet_devsecops)
         - 🔄 [GitHub Actions Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
         - 📦 [Download All Reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
         ---
-
         ## 📚 Next Steps
-
         1. **Download artifacts** from this workflow run
         2. **Open \`zap-reports/index.html\`** in your browser for DAST results
         3. **Review high-priority issues** in each report
         4. **Implement fixes** for critical vulnerabilities
         5. **Re-run pipeline** to verify fixes
-
         ---
-
         *🤖 Generated automatically by DevSecOps Pipeline | Powered by GitHub Actions*
         EOF
-
         echo "✅ Security Dashboard généré avec succès"
         cat security-dashboard.md
-
     # =========================
     # 13. Upload Artifacts (TOUT INCLUS)
     # =========================
