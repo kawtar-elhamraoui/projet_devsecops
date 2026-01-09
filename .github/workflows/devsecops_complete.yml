@@ -111,31 +111,52 @@ jobs:
         curl -f http://localhost:8000 || echo "API non accessible"
 
     # =========================
-    # 11. DAST - OWASP ZAP
-    # =========================
+# 11. DAST - OWASP ZAP (CORRIGÉ)
+# =========================
     - name: DAST - OWASP ZAP
       continue-on-error: true
       run: |
+        echo "🔍 Démarrage du scan DAST avec OWASP ZAP..."
         mkdir -p zap-reports
-
+        
+        # Utiliser l'image officielle corrigée
         docker run --rm -d \
           -p $ZAP_PORT:$ZAP_PORT \
           --name zap \
-          owasp/zap2docker-stable zap.sh \
+          ghcr.io/zaproxy/zaproxy:stable zap.sh \
           -daemon -host 0.0.0.0 -port $ZAP_PORT \
           -config api.disablekey=true
-
-        sleep 20
-
-        docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT spider $API_URL
-        docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT active-scan $API_URL
-
-        docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT report -o /zap/wrk/zap-report.html -f html
-        docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT report -o /zap/wrk/zap-report.json -f json
-
-        docker cp zap:/zap/wrk/zap-report.html zap-reports/
-        docker cp zap:/zap/wrk/zap-report.json zap-reports/
-
+        
+        sleep 25
+        
+        # Attendre que l'API soit bien disponible
+        echo "Vérification de l'API..."
+        if curl -s $API_URL > /dev/null; then
+          echo "✅ API accessible, lancement du scan..."
+          
+          # Spider pour découvrir les endpoints
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT spider $API_URL
+          sleep 10
+          
+          # Scan actif rapide
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT active-scan $API_URL
+          sleep 15
+          
+          # Générer les rapports
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT report -o /zap/wrk/zap-report.html -f html
+          docker exec zap zap-cli --zap-url http://localhost:$ZAP_PORT report -o /zap/wrk/zap-report.json -f json
+          
+          # Copier les rapports
+          docker cp zap:/zap/wrk/zap-report.html zap-reports/
+          docker cp zap:/zap/wrk/zap-report.json zap-reports/
+          
+          echo "✅ Scan DAST terminé avec succès"
+        else
+          echo "⚠️ API non accessible, scan DAST ignoré"
+        fi
+        
+        # Arrêter ZAP
+        docker stop zap || true
     # =========================
     # 12. Generate Security Dashboard
     # =========================
