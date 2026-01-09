@@ -109,31 +109,41 @@ jobs:
         docker run -d --name micro-app-api -p 8000:8000 micro-app:latest
         sleep 15
         curl -f http://localhost:8000 || echo "API non accessible"
+   # =========================
+    # 10.5. Test Active des Vulnérabilités (VERSION AMÉLIORÉE)
     # =========================
-    # 10.5. REAL Vulnerability Testing (FIXED)
-    # =========================
-    - name: Real Vulnerability Testing
+    - name: Active Vulnerability Testing
       run: |
-        echo "🎯 REAL Testing of vulnerable endpoints..."
+        echo "🎯 Test actif de toutes les vulnérabilités - Version Améliorée..."
         
-        # Attendre l'API
+        # Attendre que l'API soit prête
+        echo "⏳ Waiting for API to be ready..."
         sleep 5
         
-        # Installer curl et jq pour les tests
-        sudo apt-get update && sudo apt-get install -y curl jq
+        # Vérifier que l'API répond
+        for i in {1..10}; do
+          if curl -s http://localhost:8000/health > /dev/null; then
+            echo "✅ API is responding!"
+            break
+          fi
+          echo "  Attempt $i/10..."
+          sleep 2
+        done
         
-        # Test REAL des endpoints vulnérables
-        echo "Testing SQL Injection endpoints..."
-        curl -s "http://localhost:8000/vuln1/sql/search?username=test' OR '1'='1" && echo ""
-        curl -s "http://localhost:8000/vuln1/sql/union?search=test' UNION SELECT 1,2--" && echo ""
+        # Installer requests pour les tests
+        pip install requests
         
-        echo "Testing Command Injection endpoints..."
-        curl -s "http://localhost:8000/vuln2/cmd/ping?host=127.0.0.1;whoami" && echo ""
+        # Copier le script de test amélioré
+        cd micro_app
         
-        echo "Testing Path Traversal..."
-        curl -s "http://localhost:8000/vuln4/file/read?filename=../../../etc/passwd" && echo ""
+        # Exécuter le script de test amélioré
+        python3 test_all_vulns_improved.py
         
-        echo "✅ Real tests completed - ZAP should see these now"
+        echo ""
+        echo "⏳ Waiting 20 seconds for ZAP to capture and analyze requests..."
+        sleep 20
+        
+        echo "✅ Active testing completed - ZAP ready for scanning"
     # =========================
     # 11. DAST - OWASP ZAP (VERSION CORRIGÉE - SCAN EXPLICITE)
     # =========================
