@@ -73,21 +73,26 @@ def command_injection(cmd: str):
     }
 
 # ========== ENDPOINTS SÉCURISÉS (CONTRE-EXEMPLES) ==========
-@app.get("/secure/sql/{user_input}")
-def secure_sql(user_input: str):
-    """✅ SÉCURISÉ : Pas d'injection SQL"""
+@app.get("/vuln/sql/{user_input}")
+def sql_injection(user_input: str):
+    """⚠️ VULNÉRABLE : Injection SQL"""
     conn = sqlite3.connect("test.db")
-    # SÉCURISÉ : requête paramétrée
-    cursor = conn.execute("SELECT * FROM users WHERE username = ?", (user_input,))
+    cursor = conn.execute(f"SELECT * FROM users WHERE username = '{user_input}'")
     results = cursor.fetchall()
     conn.close()
     
-    return {
-        "security": "SQL sécurisé",
-        "query": "SELECT * FROM users WHERE username = ?",
-        "param": user_input,
-        "results": results
+    response = {
+        "vulnerability": "SQL Injection",
+        "query": f"SELECT * FROM users WHERE username = '{user_input}'",
+        "results": results,
+        "example_exploit": "Essayez avec: admin' OR '1'='1"
     }
+    
+    # UNE SEULE LIGNE pour aider DAST à détecter
+    if "' OR '" in user_input.upper() and len(results) > 1:
+        response["warning"] = "MULTIPLE_USERS_RETURNED"
+    
+    return response
 
 @app.post("/secure/deserialize")
 def secure_deserialize(data: str):
@@ -101,18 +106,24 @@ def secure_deserialize(data: str):
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-@app.get("/secure/command/{cmd}")
-def secure_command(cmd: str):
-    """✅ SÉCURISÉ : Pas de command injection"""
-    allowed = ["echo", "date", "pwd"]
-    if cmd not in allowed:
-        raise HTTPException(status_code=400, detail="Commande non autorisée")
+@app.get("/vuln/command/{cmd}")
+def command_injection(cmd: str):
+    """⚠️ VULNÉRABLE : Command Injection"""
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     
-    result = subprocess.run([cmd], shell=False, capture_output=True, text=True)
-    return {
-        "security": "Commande sécurisée",
-        "output": result.stdout
+    response = {
+        "vulnerability": "Command Injection",
+        "command": cmd,
+        "output": result.stdout[:100],  # Limiter la sortie
+        "error": result.stderr,
+        "example_exploit": "Essayez avec: ls; cat /etc/passwd"
     }
+    
+    # UNE SEULE LIGNE pour aider DAST
+    if ";" in cmd or "&&" in cmd:
+        response["shell_metacharacters"] = True
+    
+    return response
 
 # ========== ENDPOINTS UTILES ==========
 @app.get("/")
