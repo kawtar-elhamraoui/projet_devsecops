@@ -24,16 +24,14 @@ def init_db():
     conn = sqlite3.connect("test.db")
     cursor = conn.cursor()
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS products (
+        CREATE TABLE IF NOT EXISTS products (  # ← CHANGER ICI
             id INTEGER PRIMARY KEY,
             name TEXT,
             price REAL
         )
     """)
-    # Ajouter des données de test
     cursor.execute("INSERT OR IGNORE INTO products (name, price) VALUES ('Laptop', 999.99)")
     cursor.execute("INSERT OR IGNORE INTO products (name, price) VALUES ('Phone', 499.99)")
-    cursor.execute("INSERT OR IGNORE INTO products (name, price) VALUES ('Tablet', 299.99)")
     conn.commit()
     conn.close()
 
