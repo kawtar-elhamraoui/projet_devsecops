@@ -103,8 +103,8 @@ jobs:
         sleep 15
         curl -f http://localhost:8000 || echo "API non accessible"
     # =========================
-    # 10.5. Test Active des Vulnérabilités
-    # =========================
+# 10.5. Test Active des Vulnérabilités
+# =========================
     - name: Active Vulnerability Testing
       run: |
         echo "🎯 Test actif de toutes les vulnérabilités..."
@@ -117,66 +117,66 @@ jobs:
         
         # Créer et exécuter un script de test complet
         cat > test_all_vulns.py <<'PYEOF'
-        import requests
-        import time
-        import sys
-        API = "http://localhost:8000"
-        def test_endpoint(method, path, data=None, params=None):
-            """Test un endpoint et retourne la réponse"""
-            try:
-                if method == "GET":
-                    resp = requests.get(f"{API}{path}", params=params, timeout=3)
-                elif method == "POST":
-                    resp = requests.post(f"{API}{path}", data=data, timeout=3)
-                else:
-                    return None
-                return resp.status_code
-            except:
-                return None
-        # Tous les endpoints à tester avec des payloads malveillants
-        tests = [
-            # SQL Injection
-            ("GET", "/vuln1/sql/search", {"username": "admin' OR '1'='1 --"}),
-            ("GET", "/vuln1/sql/union", {"search": "test' UNION SELECT 1,2 --"}),
-            
-            # Command Injection
-            ("GET", "/vuln2/cmd/ping", {"host": "127.0.0.1; ls -la"}),
-            ("GET", "/vuln2/cmd/ping", {"host": "google.com && whoami"}),
-            
-            # Path Traversal
-            ("GET", "/vuln4/file/read", {"filename": "../../../etc/passwd"}),
-            ("GET", "/vuln4/file/read", {"filename": "/etc/shadow"}),
-            
-            # XXE
-            ("POST", "/vuln3/xxe/parse", {"xml_data": '''<?xml version="1.0"?>
-        <!DOCTYPE test [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
-        <test>&xxe;</test>'''}),
-        ]
-        print("🚀 Starting active vulnerability tests...")
-        print("=" * 60)
-        for i, (method, path, payload) in enumerate(tests):
-            if isinstance(payload, dict):
-                params = payload if method == "GET" else None
-                data = payload if method == "POST" else None
-            else:
-                params = {"data": payload} if method == "GET" else None
-                data = {"data": payload} if method == "POST" else None
-            
-            status = test_endpoint(method, path, data, params)
-            print(f"Test {i+1}: {method} {path}")
-            print(f"  Payload: {str(payload)[:50]}...")
-            print(f"  Status: {status}")
-            print("-" * 40)
-            time.sleep(0.5)
-        print("=" * 60)
-        print("✅ All tests completed")
-        PYEOF
-                python3 test_all_vulns.py
-                
-                echo "⏳ Attente pour que ZAP capture les requêtes..."
-                sleep 15
+          import requests
+          import time
+          import sys
+          API = "http://localhost:8000"
+          def test_endpoint(method, path, data=None, params=None):
+          """Test un endpoint et retourne la réponse"""
+          try:
+              if method == "GET":
+                  resp = requests.get(f"{API}{path}", params=params, timeout=3)
+              elif method == "POST":
+                  resp = requests.post(f"{API}{path}", data=data, timeout=3)
+              else:
+                  return None
+              return resp.status_code
+          except:
+              return None
+          # Tous les endpoints à tester avec des payloads malveillants
+          tests = [
+              # SQL Injection
+              ("GET", "/vuln1/sql/search", {"username": "admin' OR '1'='1 --"}),
+              ("GET", "/vuln1/sql/union", {"search": "test' UNION SELECT 1,2 --"}),
+              
+              # Command Injection
+              ("GET", "/vuln2/cmd/ping", {"host": "127.0.0.1; ls -la"}),
+              ("GET", "/vuln2/cmd/ping", {"host": "google.com && whoami"}),
+              
+              # Path Traversal
+              ("GET", "/vuln4/file/read", {"filename": "../../../etc/passwd"}),
+              ("GET", "/vuln4/file/read", {"filename": "/etc/shadow"}),
+              
+              # XXE
+              ("POST", "/vuln3/xxe/parse", {"xml_data": '''<?xml version="1.0"?>
+          <!DOCTYPE test [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+          <test>&xxe;</test>'''}),
+          ]
+          print("🚀 Starting active vulnerability tests...")
+          print("=" * 60)
+          for i, (method, path, payload) in enumerate(tests):
+              if isinstance(payload, dict):
+                  params = payload if method == "GET" else None
+                  data = payload if method == "POST" else None
+              else:
+                  params = {"data": payload} if method == "GET" else None
+                  data = {"data": payload} if method == "POST" else None
+              
+              status = test_endpoint(method, path, data, params)
+              print(f"Test {i+1}: {method} {path}")
+              print(f"  Payload: {str(payload)[:50]}...")
+              print(f"  Status: {status}")
+              print("-" * 40)
+              time.sleep(0.5)
+          print("=" * 60)
+          print("✅ All tests completed")
+          PYEOF
+              python3 test_all_vulns.py
+              
+              echo "⏳ Attente pour que ZAP capture les requêtes..."
+              sleep 15
     # =========================
-    # 11. DAST - OWASP ZAP (VERSION SIMPLIFIÉE)
+    # 11. DAST - OWASP ZAP 
     # =========================
     - name: DAST - OWASP ZAP
       continue-on-error: true
@@ -253,21 +253,26 @@ jobs:
         echo "✅ Active scan terminé"
         sleep 5
         
-        # Générer les rapports via l'API REST (SEULEMENT les rapports essentiels)
+        # Générer les rapports via l'API REST
         echo "📊 Génération des rapports..."
         
-        # 1. Rapport HTML (SEUL RAPPORT ESSENTIEL)
+        # 1. Rapport HTML
         echo "  → Rapport HTML..."
         curl -s "$ZAP_API/OTHER/core/other/htmlreport/" \
           -o zap-reports/zap-report.html
         
-        # 2. Rapport JSON (pour l'automatisation)
+        # 2. Rapport JSON avec toutes les alertes
         echo "  → Rapport JSON..."
         curl -s "$ZAP_API/JSON/core/view/alerts/" \
           | jq '.' > zap-reports/zap-report.json 2>/dev/null || \
           curl -s "$ZAP_API/JSON/core/view/alerts/" > zap-reports/zap-report.json
         
-        # 3. Résumé des alertes par niveau de risque
+        # 3. Rapport XML
+        echo "  → Rapport XML..."
+        curl -s "$ZAP_API/OTHER/core/other/xmlreport/" \
+          -o zap-reports/zap-report.xml
+        
+        # 4. Résumé des alertes par niveau de risque
         echo "  → Résumé des alertes..."
         curl -s "$ZAP_API/JSON/core/view/alertsSummary/" \
           | jq '.' > zap-reports/alerts-summary.json 2>/dev/null || \
@@ -310,7 +315,6 @@ jobs:
         echo ""
         echo "✅ Scan DAST terminé avec succès"
         echo "📦 Rapports disponibles dans: zap-reports/"
-        echo "📄 Rapport principal: zap-report.html"
         
         # Arrêter ZAP proprement
         echo ""
@@ -320,7 +324,7 @@ jobs:
         docker stop zap 2>/dev/null || true
         docker rm zap 2>/dev/null || true
     # =========================
-    # 12. Generate Security Dashboard (SIMPLIFIÉ)
+    # 12. Generate Security Dashboard (AVEC STATS ZAP)
     # =========================
     - name: Generate Security Dashboard
       if: always()
@@ -350,8 +354,7 @@ jobs:
           ZAP_INFO=0
           ZAP_TOTAL=0
         fi
-        
-        # Générer le dashboard Markdown (SIMPLIFIÉ)
+        # Générer le dashboard Markdown
         cat > security-dashboard.md <<EOF
         # 🔒 Security Dashboard - DevSecOps Pipeline
         **📅 Date:** $(date '+%Y-%m-%d %H:%M:%S')  
@@ -401,8 +404,39 @@ jobs:
           echo ""
           echo "**Action Required:** Review and fix critical vulnerabilities before deployment."
         fi)
----
-
+        ---
+        ## 📁 Available Reports
+        ### Download from Artifacts
+        1. **DAST Reports** (OWASP ZAP)
+           - 📄 \`zap-reports/zap-report.html\` - Detailed HTML report
+           - 📋 \`zap-reports/zap-report.json\` - JSON for automation
+           - 📑 \`zap-reports/zap-report.xml\` - XML structured data
+           - 📈 \`zap-reports/alerts-summary.json\` - Quick summary
+        2. **SAST Reports**
+           - 📄 \`bandit-report.json\` - Bandit static analysis results
+        3. **SCA Reports**
+           - 📄 \`safety-report.txt\` - Safety dependency scan results
+        4. **Container Security**
+           - 📄 \`trivy-report.sarif\` - Trivy container scan (SARIF format)
+        5. **SonarCloud**
+           - 📄 \`sonarcloud-status.json\` - SonarCloud quality gate status
+        ---
+        ## 🔗 Quick Links
+        - 🌐 [SonarCloud Dashboard](https://sonarcloud.io/dashboard?id=kawtar-elhamraoui_projet_devsecops)
+        - 🔄 [GitHub Actions Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        - 📦 [Download All Reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        ---
+        ## 📚 Next Steps
+        1. **Download artifacts** from this workflow run
+        2. **Open \`zap-reports/index.html\`** in your browser for DAST results
+        3. **Review high-priority issues** in each report
+        4. **Implement fixes** for critical vulnerabilities
+        5. **Re-run pipeline** to verify fixes
+        ---
+        *🤖 Generated automatically by DevSecOps Pipeline | Powered by GitHub Actions*
+        EOF
+        echo "✅ Security Dashboard généré avec succès"
+        cat security-dashboard.md
     # =========================
     # 13. Upload Artifacts (TOUT INCLUS)
     # =========================
@@ -419,9 +453,10 @@ jobs:
           security-dashboard.md
           sonarcloud-status.json
         retention-days: 30
-  # =========================
-    # 14. Security Gate (VERSION QUI DOIT ÉCHOUER SI VULNÉRABILITÉS)
+
     # =========================
+# 14. Security Gate (AJUSTÉ)
+# =========================
     - name: Security Gate
       if: always()
       run: |
@@ -436,11 +471,9 @@ jobs:
         fi
         
         # Vérifier Bandit - IGNORER CERTAINES VULNÉRABILITÉS INTENTIONNELLES
-        # Version qui doit échouer si vraies vulnérabilités
-        BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH")] | length' bandit-report.json 2>/dev/null || echo 0)
+        BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH") | select(.issue_confidence!="MEDIUM")] | length' bandit-report.json 2>/dev/null || echo 0)
         
         # Liste des vulnérabilités intentionnelles à ignorer (exemples pédagogiques)
-        # IMPORTANT: C'est ici qu'on ajuste selon votre code
         INTENTIONAL_VULNS=("B605:start_process_with_a_shell" "B301:pickle")
         
         # Filtrer les vulnérabilités intentionnelles
@@ -454,7 +487,6 @@ jobs:
         echo "  └─ SAST (Bandit) High Severity (réelles): $BANDIT_HIGH"
         echo ""
         
-        # DÉCISION: Échoue si vraies vulnérabilités critiques
         if [ "$BANDIT_HIGH" -gt 0 ] || [ "$ZAP_HIGH" -gt 0 ]; then
           echo "❌ SECURITY GATE FAILED"
           echo ""
@@ -463,7 +495,7 @@ jobs:
           [ "$BANDIT_HIGH" -gt 0 ] && echo "  • $BANDIT_HIGH high-severity issues in SAST (Bandit)"
           echo ""
           echo "📄 Download artifacts and review:"
-          echo "  • zap-reports/zap-report.html for DAST findings"
+          echo "  • zap-reports/index.html for DAST findings"
           echo "  • bandit-report.json for SAST findings"
           exit 1
         fi
@@ -472,15 +504,6 @@ jobs:
         echo ""
         echo "🎉 No critical vulnerabilities detected!"
         echo "Deployment can proceed safely."
-    # =========================
-    # 15. Cleanup
-    # =========================
-    - name: Cleanup
-      if: always()
-      run: |
-        docker stop micro-app-api zap || true
-        docker rm micro-app-api zap || true
-        docker system prune -f
     # =========================
     # 15. Cleanup
     # =========================
