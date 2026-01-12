@@ -103,8 +103,8 @@ jobs:
         sleep 15
         curl -f http://localhost:8000 || echo "API non accessible"
     # =========================
-# 10.5. Test Active des Vulnérabilités
-# =========================
+    # 10.5. Test Active des Vulnérabilités
+    # =========================
     - name: Active Vulnerability Testing
       run: |
         echo "🎯 Test actif de toutes les vulnérabilités..."
@@ -117,66 +117,66 @@ jobs:
         
         # Créer et exécuter un script de test complet
         cat > test_all_vulns.py <<'PYEOF'
-          import requests
-          import time
-          import sys
-          API = "http://localhost:8000"
-          def test_endpoint(method, path, data=None, params=None):
-          """Test un endpoint et retourne la réponse"""
-          try:
-              if method == "GET":
-                  resp = requests.get(f"{API}{path}", params=params, timeout=3)
-              elif method == "POST":
-                  resp = requests.post(f"{API}{path}", data=data, timeout=3)
-              else:
-                  return None
-              return resp.status_code
-          except:
-              return None
-          # Tous les endpoints à tester avec des payloads malveillants
-          tests = [
-              # SQL Injection
-              ("GET", "/vuln1/sql/search", {"username": "admin' OR '1'='1 --"}),
-              ("GET", "/vuln1/sql/union", {"search": "test' UNION SELECT 1,2 --"}),
-              
-              # Command Injection
-              ("GET", "/vuln2/cmd/ping", {"host": "127.0.0.1; ls -la"}),
-              ("GET", "/vuln2/cmd/ping", {"host": "google.com && whoami"}),
-              
-              # Path Traversal
-              ("GET", "/vuln4/file/read", {"filename": "../../../etc/passwd"}),
-              ("GET", "/vuln4/file/read", {"filename": "/etc/shadow"}),
-              
-              # XXE
-              ("POST", "/vuln3/xxe/parse", {"xml_data": '''<?xml version="1.0"?>
-          <!DOCTYPE test [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
-          <test>&xxe;</test>'''}),
-          ]
-          print("🚀 Starting active vulnerability tests...")
-          print("=" * 60)
-          for i, (method, path, payload) in enumerate(tests):
-              if isinstance(payload, dict):
-                  params = payload if method == "GET" else None
-                  data = payload if method == "POST" else None
-              else:
-                  params = {"data": payload} if method == "GET" else None
-                  data = {"data": payload} if method == "POST" else None
-              
-              status = test_endpoint(method, path, data, params)
-              print(f"Test {i+1}: {method} {path}")
-              print(f"  Payload: {str(payload)[:50]}...")
-              print(f"  Status: {status}")
-              print("-" * 40)
-              time.sleep(0.5)
-          print("=" * 60)
-          print("✅ All tests completed")
-          PYEOF
-              python3 test_all_vulns.py
-              
-              echo "⏳ Attente pour que ZAP capture les requêtes..."
-              sleep 15
+        import requests
+        import time
+        import sys
+        API = "http://localhost:8000"
+        def test_endpoint(method, path, data=None, params=None):
+            """Test un endpoint et retourne la réponse"""
+            try:
+                if method == "GET":
+                    resp = requests.get(f"{API}{path}", params=params, timeout=3)
+                elif method == "POST":
+                    resp = requests.post(f"{API}{path}", data=data, timeout=3)
+                else:
+                    return None
+                return resp.status_code
+            except:
+                return None
+        # Tous les endpoints à tester avec des payloads malveillants
+        tests = [
+            # SQL Injection
+            ("GET", "/vuln1/sql/search", {"username": "admin' OR '1'='1 --"}),
+            ("GET", "/vuln1/sql/union", {"search": "test' UNION SELECT 1,2 --"}),
+            
+            # Command Injection
+            ("GET", "/vuln2/cmd/ping", {"host": "127.0.0.1; ls -la"}),
+            ("GET", "/vuln2/cmd/ping", {"host": "google.com && whoami"}),
+            
+            # Path Traversal
+            ("GET", "/vuln4/file/read", {"filename": "../../../etc/passwd"}),
+            ("GET", "/vuln4/file/read", {"filename": "/etc/shadow"}),
+            
+            # XXE
+            ("POST", "/vuln3/xxe/parse", {"xml_data": '''<?xml version="1.0"?>
+        <!DOCTYPE test [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+        <test>&xxe;</test>'''}),
+        ]
+        print("🚀 Starting active vulnerability tests...")
+        print("=" * 60)
+        for i, (method, path, payload) in enumerate(tests):
+            if isinstance(payload, dict):
+                params = payload if method == "GET" else None
+                data = payload if method == "POST" else None
+            else:
+                params = {"data": payload} if method == "GET" else None
+                data = {"data": payload} if method == "POST" else None
+            
+            status = test_endpoint(method, path, data, params)
+            print(f"Test {i+1}: {method} {path}")
+            print(f"  Payload: {str(payload)[:50]}...")
+            print(f"  Status: {status}")
+            print("-" * 40)
+            time.sleep(0.5)
+        print("=" * 60)
+        print("✅ All tests completed")
+        PYEOF
+                python3 test_all_vulns.py
+                
+                echo "⏳ Attente pour que ZAP capture les requêtes..."
+                sleep 15
     # =========================
-    # 11. DAST - OWASP ZAP (VERSION 100% FONCTIONNELLE - API REST)
+    # 11. DAST - OWASP ZAP (VERSION SIMPLIFIÉE)
     # =========================
     - name: DAST - OWASP ZAP
       continue-on-error: true
@@ -253,26 +253,21 @@ jobs:
         echo "✅ Active scan terminé"
         sleep 5
         
-        # Générer les rapports via l'API REST
+        # Générer les rapports via l'API REST (SEULEMENT les rapports essentiels)
         echo "📊 Génération des rapports..."
         
-        # 1. Rapport HTML
+        # 1. Rapport HTML (SEUL RAPPORT ESSENTIEL)
         echo "  → Rapport HTML..."
         curl -s "$ZAP_API/OTHER/core/other/htmlreport/" \
           -o zap-reports/zap-report.html
         
-        # 2. Rapport JSON avec toutes les alertes
+        # 2. Rapport JSON (pour l'automatisation)
         echo "  → Rapport JSON..."
         curl -s "$ZAP_API/JSON/core/view/alerts/" \
           | jq '.' > zap-reports/zap-report.json 2>/dev/null || \
           curl -s "$ZAP_API/JSON/core/view/alerts/" > zap-reports/zap-report.json
         
-        # 3. Rapport XML
-        echo "  → Rapport XML..."
-        curl -s "$ZAP_API/OTHER/core/other/xmlreport/" \
-          -o zap-reports/zap-report.xml
-        
-        # 4. Résumé des alertes par niveau de risque
+        # 3. Résumé des alertes par niveau de risque
         echo "  → Résumé des alertes..."
         curl -s "$ZAP_API/JSON/core/view/alertsSummary/" \
           | jq '.' > zap-reports/alerts-summary.json 2>/dev/null || \
@@ -312,193 +307,10 @@ jobs:
           echo "  ⚠️ Aucun rapport JSON généré"
         fi
         
-        # Créer une page index HTML pour faciliter la navigation
-        cat > zap-reports/index.html <<'INDEXEOF'
-        <!DOCTYPE html>
-        <html lang="fr">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>DAST Security Reports - OWASP ZAP</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    min-height: 100vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 20px;
-                }
-                .container {
-                    background: white;
-                    max-width: 900px;
-                    width: 100%;
-                    border-radius: 20px;
-                    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                    overflow: hidden;
-                }
-                .header {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 40px;
-                    text-align: center;
-                }
-                .header h1 {
-                    font-size: 2.5em;
-                    margin-bottom: 10px;
-                    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-                }
-                .header p {
-                    font-size: 1.1em;
-                    opacity: 0.9;
-                }
-                .content {
-                    padding: 40px;
-                }
-                .info-box {
-                    background: #f8f9fa;
-                    border-left: 5px solid #667eea;
-                    padding: 20px;
-                    margin-bottom: 30px;
-                    border-radius: 5px;
-                }
-                .info-box strong {
-                    color: #667eea;
-                    display: block;
-                    margin-bottom: 5px;
-                }
-                .reports-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                    gap: 20px;
-                    margin-top: 30px;
-                }
-                .report-card {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 30px;
-                    border-radius: 15px;
-                    text-decoration: none;
-                    transition: transform 0.3s, box-shadow 0.3s;
-                    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-                }
-                .report-card:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                }
-                .report-card .icon {
-                    font-size: 3em;
-                    margin-bottom: 15px;
-                }
-                .report-card h3 {
-                    font-size: 1.3em;
-                    margin-bottom: 10px;
-                }
-                .report-card p {
-                    opacity: 0.9;
-                    font-size: 0.95em;
-                }
-                .tip {
-                    background: #fff3cd;
-                    border-left: 5px solid #ffc107;
-                    padding: 20px;
-                    margin-top: 30px;
-                    border-radius: 5px;
-                }
-                .tip strong {
-                    color: #856404;
-                    display: block;
-                    margin-bottom: 10px;
-                }
-                footer {
-                    text-align: center;
-                    padding: 20px;
-                    color: #6c757d;
-                    font-size: 0.9em;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🔍 DAST Security Reports</h1>
-                    <p>OWASP ZAP - Dynamic Application Security Testing</p>
-                </div>
-                
-                <div class="content">
-                    <div class="info-box">
-                        <strong>📅 Scan Date:</strong>
-                        <p id="scan-date"></p>
-                        <strong>🎯 Target API:</strong>
-                        <p>http://localhost:8000</p>
-                        <strong>🛠️ Tool:</strong>
-                        <p>OWASP ZAP (Zed Attack Proxy)</p>
-                    </div>
-                    
-                    <h2 style="margin-bottom: 20px; color: #333;">📊 Available Reports</h2>
-                    
-                    <div class="reports-grid">
-                        <a href="zap-report.html" class="report-card" target="_blank">
-                            <div class="icon">📄</div>
-                            <h3>HTML Report</h3>
-                            <p>Detailed interactive view with all vulnerabilities and recommendations</p>
-                        </a>
-                        
-                        <a href="zap-report.json" class="report-card" target="_blank">
-                            <div class="icon">📋</div>
-                            <h3>JSON Report</h3>
-                            <p>Machine-readable format for automated processing and CI/CD integration</p>
-                        </a>
-                        
-                        <a href="zap-report.xml" class="report-card" target="_blank">
-                            <div class="icon">📑</div>
-                            <h3>XML Report</h3>
-                            <p>Structured data format compatible with security tools and SIEM systems</p>
-                        </a>
-                        
-                        <a href="alerts-summary.json" class="report-card" target="_blank">
-                            <div class="icon">📈</div>
-                            <h3>Alerts Summary</h3>
-                            <p>Quick overview of findings grouped by risk level and category</p>
-                        </a>
-                    </div>
-                    
-                    <div class="tip">
-                        <strong>💡 Recommendation</strong>
-                        <p>Open the <strong>HTML Report</strong> for the best visualization of vulnerabilities with:</p>
-                        <ul style="margin-top: 10px; margin-left: 20px;">
-                            <li>Risk severity ratings (High, Medium, Low, Info)</li>
-                            <li>Detailed vulnerability descriptions</li>
-                            <li>Affected URLs and parameters</li>
-                            <li>Remediation guidance and best practices</li>
-                            <li>References to security standards (OWASP, CWE)</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <footer>
-                    <p>Generated by DevSecOps Pipeline | OWASP ZAP Security Scanner</p>
-                </footer>
-            </div>
-            
-            <script>
-                document.getElementById('scan-date').textContent = new Date().toLocaleString('fr-FR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            </script>
-        </body>
-        </html>
-        INDEXEOF
-        
         echo ""
         echo "✅ Scan DAST terminé avec succès"
         echo "📦 Rapports disponibles dans: zap-reports/"
+        echo "📄 Rapport principal: zap-report.html"
         
         # Arrêter ZAP proprement
         echo ""
@@ -508,7 +320,7 @@ jobs:
         docker stop zap 2>/dev/null || true
         docker rm zap 2>/dev/null || true
     # =========================
-    # 12. Generate Security Dashboard (AVEC STATS ZAP)
+    # 12. Generate Security Dashboard (SIMPLIFIÉ)
     # =========================
     - name: Generate Security Dashboard
       if: always()
@@ -538,7 +350,8 @@ jobs:
           ZAP_INFO=0
           ZAP_TOTAL=0
         fi
-        # Générer le dashboard Markdown
+        
+        # Générer le dashboard Markdown (SIMPLIFIÉ)
         cat > security-dashboard.md <<EOF
         # 🔒 Security Dashboard - DevSecOps Pipeline
         **📅 Date:** $(date '+%Y-%m-%d %H:%M:%S')  
@@ -560,9 +373,11 @@ jobs:
         - **🟠 Medium Severity:** $BANDIT_MEDIUM
         - **🟡 Low Severity:** $BANDIT_LOW
         - **Status:** $([ $BANDIT_HIGH -eq 0 ] && echo "✅ No critical issues" || echo "❌ $BANDIT_HIGH critical issues found")
+
         ### 2️⃣ SCA - Software Composition Analysis (Safety)
         - **Vulnerable Dependencies:** $SAFETY_ISSUES
         - **Status:** $([ $SAFETY_ISSUES -eq 0 ] && echo "✅ All dependencies are safe" || echo "⚠️ $SAFETY_ISSUES vulnerable dependencies detected")
+
         ### 3️⃣ DAST - Dynamic Application Security Testing (OWASP ZAP)
         - **Total Alerts:** $ZAP_TOTAL
         - **🔴 High Risk:** $ZAP_HIGH
@@ -570,6 +385,7 @@ jobs:
         - **🟡 Low Risk:** $ZAP_LOW
         - **🔵 Informational:** $ZAP_INFO
         - **Status:** $([ $ZAP_HIGH -eq 0 ] && echo "✅ No critical vulnerabilities" || echo "❌ $ZAP_HIGH critical vulnerabilities found")
+
         ### 4️⃣ Container Security (Trivy)
         - **Status:** ✅ Scan completed
         - **Details:** Check \`trivy-report.sarif\` for vulnerabilities in Docker image
@@ -588,40 +404,8 @@ jobs:
           echo ""
           echo "**Action Required:** Review and fix critical vulnerabilities before deployment."
         fi)
-        ---
-        ## 📁 Available Reports
-        ### Download from Artifacts
-        1. **DAST Reports** (OWASP ZAP)
-           - 📄 \`zap-reports/index.html\` - **Start here!** Navigation dashboard
-           - 📄 \`zap-reports/zap-report.html\` - Detailed HTML report
-           - 📋 \`zap-reports/zap-report.json\` - JSON for automation
-           - 📑 \`zap-reports/zap-report.xml\` - XML structured data
-           - 📈 \`zap-reports/alerts-summary.json\` - Quick summary
-        2. **SAST Reports**
-           - 📄 \`bandit-report.json\` - Bandit static analysis results
-        3. **SCA Reports**
-           - 📄 \`safety-report.txt\` - Safety dependency scan results
-        4. **Container Security**
-           - 📄 \`trivy-report.sarif\` - Trivy container scan (SARIF format)
-        5. **SonarCloud**
-           - 📄 \`sonarcloud-status.json\` - SonarCloud quality gate status
-        ---
-        ## 🔗 Quick Links
-        - 🌐 [SonarCloud Dashboard](https://sonarcloud.io/dashboard?id=kawtar-elhamraoui_projet_devsecops)
-        - 🔄 [GitHub Actions Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-        - 📦 [Download All Reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-        ---
-        ## 📚 Next Steps
-        1. **Download artifacts** from this workflow run
-        2. **Open \`zap-reports/index.html\`** in your browser for DAST results
-        3. **Review high-priority issues** in each report
-        4. **Implement fixes** for critical vulnerabilities
-        5. **Re-run pipeline** to verify fixes
-        ---
-        *🤖 Generated automatically by DevSecOps Pipeline | Powered by GitHub Actions*
-        EOF
-        echo "✅ Security Dashboard généré avec succès"
-        cat security-dashboard.md
+---
+
     # =========================
     # 13. Upload Artifacts (TOUT INCLUS)
     # =========================
@@ -640,8 +424,8 @@ jobs:
         retention-days: 30
 
     # =========================
-# 14. Security Gate (AJUSTÉ)
-# =========================
+    # 14. Security Gate (AJUSTÉ)
+    # =========================
     - name: Security Gate
       if: always()
       run: |
@@ -680,7 +464,7 @@ jobs:
           [ "$BANDIT_HIGH" -gt 0 ] && echo "  • $BANDIT_HIGH high-severity issues in SAST (Bandit)"
           echo ""
           echo "📄 Download artifacts and review:"
-          echo "  • zap-reports/index.html for DAST findings"
+          echo "  • zap-reports/zap-report.html for DAST findings"
           echo "  • bandit-report.json for SAST findings"
           exit 1
         fi

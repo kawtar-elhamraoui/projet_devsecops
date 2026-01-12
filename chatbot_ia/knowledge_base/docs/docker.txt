@@ -1,1 +1,0 @@
-Sécurité Docker: Scanner avec Trivy. Commande: trivy image mon-image. Best practices: USER non-root.
