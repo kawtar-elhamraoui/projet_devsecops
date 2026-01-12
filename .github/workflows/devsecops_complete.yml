@@ -373,11 +373,9 @@ jobs:
         - **🟠 Medium Severity:** $BANDIT_MEDIUM
         - **🟡 Low Severity:** $BANDIT_LOW
         - **Status:** $([ $BANDIT_HIGH -eq 0 ] && echo "✅ No critical issues" || echo "❌ $BANDIT_HIGH critical issues found")
-
         ### 2️⃣ SCA - Software Composition Analysis (Safety)
         - **Vulnerable Dependencies:** $SAFETY_ISSUES
         - **Status:** $([ $SAFETY_ISSUES -eq 0 ] && echo "✅ All dependencies are safe" || echo "⚠️ $SAFETY_ISSUES vulnerable dependencies detected")
-
         ### 3️⃣ DAST - Dynamic Application Security Testing (OWASP ZAP)
         - **Total Alerts:** $ZAP_TOTAL
         - **🔴 High Risk:** $ZAP_HIGH
@@ -385,7 +383,6 @@ jobs:
         - **🟡 Low Risk:** $ZAP_LOW
         - **🔵 Informational:** $ZAP_INFO
         - **Status:** $([ $ZAP_HIGH -eq 0 ] && echo "✅ No critical vulnerabilities" || echo "❌ $ZAP_HIGH critical vulnerabilities found")
-
         ### 4️⃣ Container Security (Trivy)
         - **Status:** ✅ Scan completed
         - **Details:** Check \`trivy-report.sarif\` for vulnerabilities in Docker image
@@ -422,9 +419,8 @@ jobs:
           security-dashboard.md
           sonarcloud-status.json
         retention-days: 30
-
-    # =========================
-    # 14. Security Gate (AJUSTÉ)
+  # =========================
+    # 14. Security Gate (VERSION QUI DOIT ÉCHOUER SI VULNÉRABILITÉS)
     # =========================
     - name: Security Gate
       if: always()
@@ -440,9 +436,11 @@ jobs:
         fi
         
         # Vérifier Bandit - IGNORER CERTAINES VULNÉRABILITÉS INTENTIONNELLES
-        BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH") | select(.issue_confidence!="MEDIUM")] | length' bandit-report.json 2>/dev/null || echo 0)
+        # Version qui doit échouer si vraies vulnérabilités
+        BANDIT_HIGH=$(jq '[.results[] | select(.issue_severity=="HIGH")] | length' bandit-report.json 2>/dev/null || echo 0)
         
         # Liste des vulnérabilités intentionnelles à ignorer (exemples pédagogiques)
+        # IMPORTANT: C'est ici qu'on ajuste selon votre code
         INTENTIONAL_VULNS=("B605:start_process_with_a_shell" "B301:pickle")
         
         # Filtrer les vulnérabilités intentionnelles
@@ -456,6 +454,7 @@ jobs:
         echo "  └─ SAST (Bandit) High Severity (réelles): $BANDIT_HIGH"
         echo ""
         
+        # DÉCISION: Échoue si vraies vulnérabilités critiques
         if [ "$BANDIT_HIGH" -gt 0 ] || [ "$ZAP_HIGH" -gt 0 ]; then
           echo "❌ SECURITY GATE FAILED"
           echo ""
@@ -473,6 +472,15 @@ jobs:
         echo ""
         echo "🎉 No critical vulnerabilities detected!"
         echo "Deployment can proceed safely."
+    # =========================
+    # 15. Cleanup
+    # =========================
+    - name: Cleanup
+      if: always()
+      run: |
+        docker stop micro-app-api zap || true
+        docker rm micro-app-api zap || true
+        docker system prune -f
     # =========================
     # 15. Cleanup
     # =========================
