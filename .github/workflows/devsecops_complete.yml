@@ -250,7 +250,7 @@ jobs:
           sleep 5
         done
         
-        echo "✅ Active scan terminé"
+        echo " Active scan terminé"
         sleep 5
         
         # Générer les rapports via l'API REST

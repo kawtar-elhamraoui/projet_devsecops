@@ -1,29 +1,9 @@
-version: '3.8'
-
 services:
   chatbot:
     build: .
+    container_name: chatbot_ai
     ports:
-      - "7860:7860"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - OLLAMA_HOST=http://ollama:11434
+      - "8001:7860"
     volumes:
-      - ./data:/app/data
-      - ./uploads:/app/uploads
-    depends_on:
-      - ollama
-    command: python app.py
-
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    # Pour charger le modèle au démarrage (optionnel)
-    # command: >
-    #   sh -c "ollama serve & sleep 5 && ollama pull llama3"
-
-volumes:
-  ollama_data:
+      - ./app:/app
+    restart: always
