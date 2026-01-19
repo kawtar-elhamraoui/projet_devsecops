@@ -102,79 +102,6 @@ jobs:
         docker run -d --name micro-app-api -p 8000:8000 micro-app:latest
         sleep 15
         curl -f http://localhost:8000 || echo "API non accessible"
-# =========================
-# 10.5. Test Active des Vulnérabilités
-# =========================
-    - name: Active Vulnerability Testing
-      run: |
-        echo "🎯 Test actif de toutes les vulnérabilités..."
-        
-        # Attendre que l'API soit prête
-        sleep 5
-        
-        # Installer requests pour les tests
-        pip install requests
-        
-        # Créer et exécuter un script de test complet
-        cat > test_all_vulns.py <<'PYEOF'
-          import requests
-          import time
-          import sys
-          API = "http://localhost:8000"
-          def test_endpoint(method, path, data=None, params=None):
-          """Test un endpoint et retourne la réponse"""
-          try:
-              if method == "GET":
-                  resp = requests.get(f"{API}{path}", params=params, timeout=3)
-              elif method == "POST":
-                  resp = requests.post(f"{API}{path}", data=data, timeout=3)
-              else:
-                  return None
-              return resp.status_code
-          except:
-              return None
-          # Tous les endpoints à tester avec des payloads malveillants
-          tests = [
-              # SQL Injection
-              ("GET", "/vuln1/sql/search", {"username": "admin' OR '1'='1 --"}),
-              ("GET", "/vuln1/sql/union", {"search": "test' UNION SELECT 1,2 --"}),
-              
-              # Command Injection
-              ("GET", "/vuln2/cmd/ping", {"host": "127.0.0.1; ls -la"}),
-              ("GET", "/vuln2/cmd/ping", {"host": "google.com && whoami"}),
-              
-              # Path Traversal
-              ("GET", "/vuln4/file/read", {"filename": "../../../etc/passwd"}),
-              ("GET", "/vuln4/file/read", {"filename": "/etc/shadow"}),
-              
-              # XXE
-              ("POST", "/vuln3/xxe/parse", {"xml_data": '''<?xml version="1.0"?>
-          <!DOCTYPE test [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
-          <test>&xxe;</test>'''}),
-          ]
-          print("🚀 Starting active vulnerability tests...")
-          print("=" * 60)
-          for i, (method, path, payload) in enumerate(tests):
-              if isinstance(payload, dict):
-                  params = payload if method == "GET" else None
-                  data = payload if method == "POST" else None
-              else:
-                  params = {"data": payload} if method == "GET" else None
-                  data = {"data": payload} if method == "POST" else None
-              
-              status = test_endpoint(method, path, data, params)
-              print(f"Test {i+1}: {method} {path}")
-              print(f"  Payload: {str(payload)[:50]}...")
-              print(f"  Status: {status}")
-              print("-" * 40)
-              time.sleep(0.5)
-          print("=" * 60)
-          print("✅ All tests completed")
-          PYEOF
-              python3 test_all_vulns.py
-              
-              echo "⏳ Attente pour que ZAP capture les requêtes..."
-              sleep 15
     # =========================
     # 11. DAST - OWASP ZAP 
     # =========================
@@ -454,9 +381,9 @@ jobs:
           sonarcloud-status.json
         retention-days: 30
 
-    # =========================
-# 14. Security Gate (AJUSTÉ)
-# =========================
+  # =========================
+  # 14. Security Gate (AJUSTÉ)
+  # =========================
     - name: Security Gate
       if: always()
       run: |
