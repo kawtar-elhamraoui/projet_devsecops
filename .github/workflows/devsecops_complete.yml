@@ -102,7 +102,7 @@ jobs:
         docker run -d --name micro-app-api -p 8000:8000 micro-app:latest
         sleep 15
         curl -f http://localhost:8000 || echo "API non accessible"
-    # =========================
+# =========================
 # 10.5. Test Active des Vulnérabilités
 # =========================
     - name: Active Vulnerability Testing
@@ -460,7 +460,7 @@ jobs:
     - name: Security Gate
       if: always()
       run: |
-        echo "🚦 Évaluation du Security Gate..."
+        echo " Évaluation du Security Gate..."
         echo ""
         
         # Vérifier les vulnérabilités critiques ZAP
@@ -512,4 +512,4 @@ jobs:
       run: |
         docker stop micro-app-api zap || true
         docker rm micro-app-api zap || true
-        docker system prune -f
+        docker system prune -fqw2

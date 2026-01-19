@@ -16,7 +16,7 @@ def init_db():
             id INTEGER PRIMARY KEY,
             username TEXT,
             email TEXT
-        )
+        ) 
     """)
     cursor.execute("INSERT OR IGNORE INTO users (username, email) VALUES ('admin', 'admin@example.com')")
     cursor.execute("INSERT OR IGNORE INTO users (username, email) VALUES ('user', 'user@example.com')")
@@ -25,7 +25,8 @@ def init_db():
 
 init_db()
 
-# ========== ENDPOINT 1: INJECTION SQL ==========
+# ========== ENDPOINTS VULNÉRABLES ==========
+
 @app.get("/vuln/sql/{user_input}")
 def sql_injection(user_input: str):
     """⚠️ VULNÉRABLE : Injection SQL"""
@@ -35,14 +36,19 @@ def sql_injection(user_input: str):
     results = cursor.fetchall()
     conn.close()
     
-    return {
+    response = {
         "vulnerability": "SQL Injection",
         "query": f"SELECT * FROM users WHERE username = '{user_input}'",
         "results": results,
         "example_exploit": "Essayez avec: admin' OR '1'='1"
     }
+    
+    # Aide DAST à détecter
+    if "' OR '" in user_input.upper() and len(results) > 1:
+        response["warning"] = "MULTIPLE_USERS_RETURNED"
+    
+    return response
 
-# ========== ENDPOINT 2: DÉSÉRIALISATION PICKLE ==========
 @app.post("/vuln/deserialize")
 def pickle_deserialize(data: str):
     """⚠️ VULNÉRABLE : Désérialisation pickle"""
@@ -58,41 +64,40 @@ def pickle_deserialize(data: str):
     except Exception as e:
         return {"error": str(e)}
 
-# ========== ENDPOINT 3: COMMAND INJECTION ==========
 @app.get("/vuln/command/{cmd}")
 def command_injection(cmd: str):
     """⚠️ VULNÉRABLE : Command Injection"""
     # VULNÉRABLE : shell=True avec input utilisateur
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    return {
+    
+    response = {
         "vulnerability": "Command Injection",
         "command": cmd,
-        "output": result.stdout,
+        "output": result.stdout[:100],
         "error": result.stderr,
         "example_exploit": "Essayez avec: ls; cat /etc/passwd"
     }
+    
+    # Aide DAST à détecter
+    if ";" in cmd or "&&" in cmd:
+        response["shell_metacharacters"] = True
+    
+    return response
 
-# ========== ENDPOINTS SÉCURISÉS (CONTRE-EXEMPLES) ==========
-@app.get("/vuln/sql/{user_input}")
-def sql_injection(user_input: str):
-    """⚠️ VULNÉRABLE : Injection SQL"""
+# ========== ENDPOINTS SÉCURISÉS ==========
+
+@app.get("/secure/sql/{user_input}")
+def secure_sql(user_input: str):
+    """✅ SÉCURISÉ : Requête paramétrée"""
     conn = sqlite3.connect("test.db")
-    cursor = conn.execute(f"SELECT * FROM users WHERE username = '{user_input}'")
+    cursor = conn.execute("SELECT * FROM users WHERE username = ?", (user_input,))
     results = cursor.fetchall()
     conn.close()
     
-    response = {
-        "vulnerability": "SQL Injection",
-        "query": f"SELECT * FROM users WHERE username = '{user_input}'",
-        "results": results,
-        "example_exploit": "Essayez avec: admin' OR '1'='1"
+    return {
+        "security": "SQL sécurisé avec paramètres",
+        "results": results
     }
-    
-    # UNE SEULE LIGNE pour aider DAST à détecter
-    if "' OR '" in user_input.upper() and len(results) > 1:
-        response["warning"] = "MULTIPLE_USERS_RETURNED"
-    
-    return response
 
 @app.post("/secure/deserialize")
 def secure_deserialize(data: str):
@@ -106,39 +111,37 @@ def secure_deserialize(data: str):
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-@app.get("/vuln/command/{cmd}")
-def command_injection(cmd: str):
-    """⚠️ VULNÉRABLE : Command Injection"""
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    
-    response = {
-        "vulnerability": "Command Injection",
-        "command": cmd,
-        "output": result.stdout[:100],  # Limiter la sortie
-        "error": result.stderr,
-        "example_exploit": "Essayez avec: ls; cat /etc/passwd"
+@app.get("/secure/command")
+def secure_command():
+    """✅ SÉCURISÉ : Commandes prédéfinies uniquement"""
+    # Liste blanche de commandes autorisées
+    allowed_commands = {
+        "date": ["date"],
+        "uptime": ["uptime"],
+        "whoami": ["whoami"]
     }
     
-    # UNE SEULE LIGNE pour aider DAST
-    if ";" in cmd or "&&" in cmd:
-        response["shell_metacharacters"] = True
-    
-    return response
+    return {
+        "security": "Commandes sécurisées (liste blanche)",
+        "allowed": list(allowed_commands.keys())
+    }
 
 # ========== ENDPOINTS UTILES ==========
+
 @app.get("/")
 def root():
     return {
-        "api": "Test de sécurité API",
+        "api": "Test de sécurité API - DevSecOps",
+        "description": "API avec vulnérabilités intentionnelles pour démonstration",
         "vulnerabilities": [
-            "/vuln/sql/{input} - Injection SQL",
-            "/vuln/deserialize - Désérialisation pickle (POST)",
-            "/vuln/command/{cmd} - Command injection"
+            "GET /vuln/sql/{input} - Injection SQL",
+            "POST /vuln/deserialize - Désérialisation pickle",
+            "GET /vuln/command/{cmd} - Command injection"
         ],
         "secure": [
-            "/secure/sql/{input} - SQL sécurisé",
-            "/secure/deserialize - JSON sécurisé (POST)",
-            "/secure/command/{cmd} - Commande sécurisée"
+            "GET /secure/sql/{input} - SQL paramétré",
+            "POST /secure/deserialize - JSON sécurisé",
+            "GET /secure/command - Commandes liste blanche"
         ]
     }
 
@@ -149,17 +152,13 @@ def health():
         "timestamp": datetime.now().isoformat()
     }
 
-# Dans micro_app/src/main.py, ajoutez UN SEUL endpoint :
-
 @app.get("/demo/dast/{input}")
 def dast_demo_endpoint(input: str):
     """Endpoint spécial pour démontrer DAST"""
     
-    # Réponse différente selon l'input
     if input == "safe":
         return {"status": "safe", "message": "Normal operation"}
     
-    # Si l'input contient du SQL
     elif "' OR '" in input:
         return {
             "status": "vulnerable",
@@ -169,7 +168,6 @@ def dast_demo_endpoint(input: str):
             "risk": "HIGH"
         }
     
-    # Si l'input contient des commandes
     elif ";" in input or "&&" in input:
         return {
             "status": "vulnerable", 
