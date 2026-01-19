@@ -439,4 +439,4 @@ jobs:
       run: |
         docker stop micro-app-api zap || true
         docker rm micro-app-api zap || true
-        docker system prune -fqw2
+        docker system prune -f || true
