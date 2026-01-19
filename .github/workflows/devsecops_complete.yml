@@ -421,7 +421,7 @@ jobs:
           [ "$ZAP_HIGH" -gt 0 ] && echo "  • $ZAP_HIGH high-risk vulnerabilities in DAST (OWASP ZAP)"
           [ "$BANDIT_HIGH" -gt 0 ] && echo "  • $BANDIT_HIGH high-severity issues in SAST (Bandit)"
           echo ""
-          echo "📄 Download artifacts and review:"
+          echo " Download artifacts and review:"
           echo "  • zap-reports/index.html for DAST findings"
           echo "  • bandit-report.json for SAST findings"
           exit 1
