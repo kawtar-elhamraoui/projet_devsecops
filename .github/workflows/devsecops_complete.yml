@@ -127,23 +127,23 @@ jobs:
         # Vérifier que ZAP est accessible
         ZAP_API="http://localhost:$ZAP_PORT"
         if ! curl -s "$ZAP_API/JSON/core/view/version/" > /dev/null; then
-          echo "❌ ZAP n'a pas démarré correctement"
+          echo " ZAP n'a pas démarré correctement"
           docker logs zap
           docker stop zap || true
           exit 0
         fi
         
         ZAP_VERSION=$(curl -s "$ZAP_API/JSON/core/view/version/" | jq -r '.version' 2>/dev/null || echo "unknown")
-        echo "✅ ZAP version $ZAP_VERSION démarré avec succès"
+        echo " ZAP version $ZAP_VERSION démarré avec succès"
         
         # Vérifier que l'API est accessible
         if ! curl -s $API_URL > /dev/null; then
-          echo "⚠️ API non accessible à $API_URL"
+          echo " API non accessible à $API_URL"
           docker stop zap || true
           exit 0
         fi
         
-        echo "✅ API accessible, lancement du scan..."
+        echo " API accessible, lancement du scan..."
         
         # Phase 1: Spider (découverte des endpoints)
         echo "🕷️ Phase 1: Spider scan..."
@@ -158,14 +158,14 @@ jobs:
           sleep 5
         done
         
-        echo "✅ Spider terminé"
+        echo " Spider terminé"
         
         # Phase 2: Passive Scan (analyse passive des réponses)
-        echo "🔍 Phase 2: Passive scan..."
+        echo " Phase 2: Passive scan..."
         sleep 10
         
         # Phase 3: Active Scan (tests actifs de vulnérabilités)
-        echo "⚡ Phase 3: Active scan..."
+        echo " Phase 3: Active scan..."
         ACTIVE_SCAN_ID=$(curl -s "$ZAP_API/JSON/ascan/action/scan/?url=$API_URL&recurse=true" | jq -r '.scan' 2>/dev/null || echo "0")
         echo "Active scan ID: $ACTIVE_SCAN_ID"
         
@@ -360,7 +360,7 @@ jobs:
         4. **Implement fixes** for critical vulnerabilities
         5. **Re-run pipeline** to verify fixes
         ---
-        *🤖 Generated automatically by DevSecOps Pipeline | Powered by GitHub Actions*
+        * Generated automatically by DevSecOps Pipeline | Powered by GitHub Actions*
         EOF
         echo "✅ Security Dashboard généré avec succès"
         cat security-dashboard.md
@@ -409,7 +409,7 @@ jobs:
           BANDIT_HIGH=$((BANDIT_HIGH - COUNT))
         done
         
-        echo "📊 Résultats ajustés du Security Gate:"
+        echo " Résultats ajustés du Security Gate:"
         echo "  ├─ DAST (ZAP) High Risk: $ZAP_HIGH"
         echo "  └─ SAST (Bandit) High Severity (réelles): $BANDIT_HIGH"
         echo ""
